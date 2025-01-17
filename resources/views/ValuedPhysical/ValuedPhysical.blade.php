@@ -54,6 +54,17 @@ $dns = new DNS2D();
         .footer td {
             padding: 5px;
         }
+
+        .detalle-columna {
+            width: 250px;
+            word-wrap: break-word;
+        }
+
+        .subtotal-row {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            border-top: 2px solid #000;
+        }
     </style>
 </head>
 
@@ -89,7 +100,7 @@ $dns = new DNS2D();
                 <thead>
                     <tr>
                         <th class="text-center bg-grey-darker text-white" rowspan="2">CÓDIGO</th>
-                        <th class="text-center bg-grey-darker text-white border-left-white" rowspan="2">DETALLE</th>
+                        <th class="text-center bg-grey-darker text-white border-left-white detalle-columna" rowspan="2" style="width: 250px;">DETALLE</th>
                         <th class="text-center bg-grey-darker text-white border-left-white" rowspan="2">UNIDAD</th>
                         <th class="text-center bg-grey-darker text-white border-left-white" colspan="3">ENTRADAS</th>
                         <th class="text-center bg-grey-darker text-white border-left-white" colspan="3">CANTIDADES</th>
@@ -107,7 +118,11 @@ $dns = new DNS2D();
                         <th class="text-center bg-grey-darker text-white border-left-white">SALDO</th>
                     </tr>
                 </thead>
+
                 <tbody class="table-striped">
+                    @php
+                    $groupTotalSaldo = 0; // Variable para acumular el total de saldos del grupo
+                    @endphp
                     @foreach ($result['materiales'] as $material)
                     @php
                     $totalEntradas = 0;
@@ -122,6 +137,9 @@ $dns = new DNS2D();
                     $cantidadEntradas = $lote['cantidad_inicial'];
                     $cantidadRestante = $lote['cantidad_restante'];
                     $precioUnitario = $lote['precio_unitario'];
+                    $cantidad_1 = $lote['cantidad_1'];
+                    $cantidad_2 = $lote['cantidad_2'];
+                    $cantidad_3 = $lote['cantidad_3'];
 
                     $totalEntradas += $cantidadEntradas;
                     $totalEntradasCosto += $cantidadEntradas * $precioUnitario;
@@ -144,24 +162,25 @@ $dns = new DNS2D();
                         @endif
                         <td class="text-center">{{ $cantidadEntradas }}</td>
                         <td class="text-right">{{ number_format($precioUnitario, 2) }}</td>
-                        <td class="text-right">{{ number_format($cantidadEntradas * $precioUnitario, 2) }}</td>
+                        <td class="text-right">{{ number_format($cantidad_1, 2) }}</td>
                         <td class="text-center">{{ $cantidadEntradas - $cantidadRestante }}</td>
                         <td class="text-right">{{ number_format($precioUnitario, 2) }}</td>
-                        <td class="text-right">{{ number_format(($cantidadEntradas - $cantidadRestante) * $precioUnitario, 2) }}</td>
+                        <td class="text-right">{{ number_format($cantidad_2, 2) }}</td>
                         <td class="text-center">{{ $cantidadRestante }}</td>
                         <td class="text-right">{{ number_format($precioUnitario, 2) }}</td>
-                        <td class="text-right">{{ number_format($cantidadRestante * $precioUnitario, 2) }}</td>
+                        <td class="text-right">{{ number_format($cantidad_3, 2) }}</td>
                     </tr>
                     @endforeach
                     <tr>
                         <td colspan="12" style="border-top: 1px solid black;"></td>
                     </tr>
-                    <tr>
+                    <tr class="subtotal-row">
                         <td colspan="3" class="text-left font-bold">SUB-TOTAL</td>
                         @php
                         $averageEntradas = $totalEntradas > 0 ? $totalEntradasCosto / $totalEntradas : 0;
                         $averageCantidades = $totalCantidades > 0 ? $totalCantidadesCosto / $totalCantidades : 0;
                         $averageSaldos = $totalSaldos > 0 ? $totalSaldosCosto / $totalSaldos : 0;
+                        $groupTotalSaldo += $totalSaldosCosto; // Acumular el total de saldos del material al total del grupo
                         @endphp
                         <td class="text-center">{{ $totalEntradas }}</td>
                         <td class="text-right">{{ number_format($averageEntradas, 2) }}</td>
@@ -173,8 +192,14 @@ $dns = new DNS2D();
                         <td class="text-right">{{ number_format($averageSaldos, 2) }}</td>
                         <td class="text-right">{{ number_format($totalSaldosCosto, 2) }}</td>
                     </tr>
+
                     @endforeach
+                    <tr>
+                        <td colspan="11" class="text-right font-bold">TOTAL EN BS :</td>
+                        <td class="text-right font-bold">{{ number_format($groupTotalSaldo, 2) }}</td>
+                    </tr>
                 </tbody>
+
 
             </table>
             <div style="margin-top: 20px;"></div>

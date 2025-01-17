@@ -142,6 +142,7 @@ class NoteRequestController extends Controller
     public function delivered_of_material(Request $request)
     {
         if ($request->status == "Approved") {
+            $latestManagement = Management::latest('id')->first();
             $materials_validate = $request->input('materials');
 
             foreach ($materials_validate as $material) {
@@ -158,7 +159,7 @@ class NoteRequestController extends Controller
                 $materialId = $material['id_material'];
                 $amountToDeliver = (int) $material['amount_to_deliver'];
                 $amount_to_be_reduced = $amountToDeliver;
-                $entries = Note_Entrie::where('state', 'Aceptado')->whereHas('materials', function ($query) use ($materialId) {
+                $entries = Note_Entrie::where('state', 'Aceptado')->where('management_id', $latestManagement->id)->whereHas('materials', function ($query) use ($materialId) {
                     $query->where('materials.id', $materialId);
                 })
                     ->where('state', '!=', 'Eliminado')
@@ -174,18 +175,18 @@ class NoteRequestController extends Controller
                     $costUnit = $entryMaterialPivot->cost_unit;
                     if ($availableAmount >= $amountToDeliver) {
                         $entryMaterialPivot->request -= $amountToDeliver;
-                        $costDetails[] = "$amountToDeliver @ $costUnit";
+                        $costDetails[] = $amountToDeliver * $costUnit;
                         $entryMaterialPivot->save();
                         break;
                     } else {
                         $amountToDeliver -= $availableAmount;
-                        $costDetails[] = "$availableAmount @ $costUnit";
+                        $costDetails[] = $availableAmount * $costUnit;
                         $entryMaterialPivot->request = 0;
                         $entryMaterialPivot->save();
                     }
                 }
 
-                $costDetailsString = implode(', ', $costDetails);
+                $costDetailsString = array_sum($costDetails);
 
                 $requestMaterial = Request_Material::where('note_id', $noteRequestId)
                     ->where('material_id', $materialId)
@@ -494,7 +495,7 @@ class NoteRequestController extends Controller
                 }),
             ];
         });
-        
+
 
         return response()->json([
             'status' => 'success',

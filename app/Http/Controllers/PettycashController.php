@@ -91,7 +91,7 @@ class PettycashController extends Controller
             ];
         });
 
-        $fund = Fund::latest()->first();
+        $fund = Fund::where('id', $request->idFund)->first();
         logger($fund->received_amount);
 
         $data = [

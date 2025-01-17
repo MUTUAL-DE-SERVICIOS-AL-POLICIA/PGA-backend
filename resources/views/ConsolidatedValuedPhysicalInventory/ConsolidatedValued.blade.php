@@ -104,14 +104,14 @@ $dns = new DNS2D();
                 <tbody class="table-striped">
                     @foreach ($results as $group)
                     <tr>
-                        <td class="text-left">{{ $group['code'] }}</td>
-                        <td class="text-left">{{ $group['name_group'] }}</td>
-                        <td class="text-left">{{ $group['previous_total_sum'] }}</td>
-                        <td class="text-left">{{ $group['previous_total_cost'] }}</td>
-                        <td class="text-left">{{ $group['latest_total_sum'] }}</td>
-                        <td class="text-left">{{ $group['latest_total_cost'] }}</td>
-                        <td class="text-left">{{ $group['latest_request_sum'] }}</td>
-                        <td class="text-left">{{ $group['latest_request_cost'] }}</td>
+                        <td class="text-left">{{ $group['codigo_grupo'] }}</td>
+                        <td class="text-left">{{ $group['grupo'] }}</td>
+                        <td class="text-left">{{ $group['total_cantidad_anterior'] }}</td>
+                        <td class="text-left">{{ $group['total_presupuesto_anterior'] }}</td>
+                        <td class="text-left">{{ $group['total_cantidad'] }}</td>
+                        <td class="text-left">{{ $group['total_presupuesto'] }}</td>
+                        <td class="text-left">{{ $group['cantidad_entregada'] }}</td>
+                        <td class="text-left">{{ $group['suma_cost_detail'] }}</td>
                     </tr>
                     @endforeach
                 </tbody>

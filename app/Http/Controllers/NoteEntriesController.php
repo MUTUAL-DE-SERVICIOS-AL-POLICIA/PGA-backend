@@ -127,7 +127,6 @@ class NoteEntriesController extends Controller
             $supplier_note = Supplier::find($request['id_supplier']);
             $period = Management::latest()->first();
 
-            // $number_note = Note_Entrie::count() + 1;
             $number_note = $this->generateNoteNumber();
             $noteEntrie = Note_Entrie::create([
                 'number_note' => $number_note,
@@ -146,11 +145,6 @@ class NoteEntriesController extends Controller
 
             foreach ($validateData['materials'] as $materialData) {
 
-                // $material = Material::find($materialData['id']);
-                // $material->state = 'Habilitado';
-                // $material->stock += $materialData['quantity'];
-                // $material->save();
-
                 $noteEntrie->materials()->attach($materialData['id'], [
                     'amount_entries' => $materialData['quantity'],
                     'request' => $materialData['quantity'],
@@ -161,13 +155,6 @@ class NoteEntriesController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
-
-                // $averageCost = DB::table('entries_material')
-                //     ->where('material_id', $materialData['id'])
-                //     ->avg('cost_unit');
-
-                // $material->average_cost = $averageCost;
-                // $material->save();
             }
             if ($noteEntrie->type_id == 2) {
                 $number_note = 0;
