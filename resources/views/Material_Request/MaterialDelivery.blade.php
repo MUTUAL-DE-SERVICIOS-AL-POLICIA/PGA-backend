@@ -72,18 +72,18 @@ $hasCajaChica = collect($materials)->contains(function ($material) {
         }
 
         .text-xs {
-            font-size: 10px;
+            font-size: 9px;
         }
 
         .text-xxxs {
-            font-size: 8px;
+            font-size: 7px;
         }
     </style>
 </head>
 
 <body style="border: 0; border-radius: 0;">
     @for($it = 0; $it<2; $it++)
-        <table class="w-100 uppercase" style="margin-top: 50px;">
+        <table class="w-100 uppercase" >
         <tr>
             <th class="w-25 text-left no-paddings no-margins align-middle">
                 <div class="text-left">
@@ -115,7 +115,7 @@ $hasCajaChica = collect($materials)->contains(function ($material) {
         </table>
         <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
         <div class="block">
-            <div class="leading-tight text-sm text-center m-b-10">{{ $title }}</div>
+            <div class="leading-tight text-center m-b-10">{{ $title }}</div>
 
             <table class="table-code w-100 m-b-10 uppercase text-xs">
                 <tbody>

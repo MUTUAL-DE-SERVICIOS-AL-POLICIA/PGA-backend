@@ -69,11 +69,11 @@ $dns = new DNS2D();
         }
 
         .text-xs {
-            font-size: 10px;
+            font-size: 9px;
         }
 
         .text-xxxs {
-            font-size: 8px;
+            font-size: 7px;
         }
     </style>
 </head>
@@ -112,7 +112,7 @@ $dns = new DNS2D();
         </table>
         <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
         <div class="block">
-            <div class="leading-tight text-sm text-center m-b-10">{{ $title }}</div>
+            <div class="leading-tight text-center m-b-10">{{ $title }}</div>
 
             <table class="table-code w-100 m-b-10 uppercase text-xs">
                 <tbody>
