@@ -855,8 +855,6 @@ class ReportController extends Controller
                 ];
             });
 
-        logger($latestGroups);
-
         $previousGroups = $previousManagement
             ? Group::whereHas('materials')
             ->with(['materials.noteRequests' => function ($query) use ($previousManagementId) {

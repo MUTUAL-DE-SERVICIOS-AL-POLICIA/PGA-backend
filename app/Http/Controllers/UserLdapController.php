@@ -155,8 +155,6 @@ class UserLdapController extends Controller
     {
         $startDate = request()->query('start_date');
         $endDate = request()->query('end_date');
-
-        logger($endDate);
         $period = Management::latest()->first();
 
         $query = NoteRequest::with(['employee', 'materials'])
@@ -258,111 +256,16 @@ class UserLdapController extends Controller
         return response()->json($result);
     }
 
-    // public function list_users_direction($id_direction)
-    // {
-    //     $startDate = request()->query('start_date');
-    //     $endDate = request()->query('end_date');
-
-    //     $period = Management::latest()->first();
-    //     if ($id_direction == 1) {
-    //         // Dirección de Estrategias Sociales e Inversiones
-    //         $name = "Dirección de Estrategias Sociales e Inversiones";
-    //         $array = [7, 8, 9];
-    //     } elseif ($id_direction == 2) {
-    //         // Dirección de Beneficios Económicos
-    //         $name = "Dirección de Beneficios Económicos";
-    //         $array = [11, 12, 13];
-    //     } elseif ($id_direction == 3) {
-    //         // Dirección de Asuntos Administrativos
-    //         $name = "Dirección de Asuntos Administrativos";
-    //         $array = [14, 15, 16, 17, 18];
-    //     } elseif ($id_direction == 4) {
-    //         // Dirección de Asesoramiento jurídico administrativo y defensa interinstitucional
-    //         $name = "Dirección de Asesoramiento jurídico administrativo y defensa interinstitucional";
-    //         $array = [19, 20, 21];
-    //     } else {
-    //         // Manejo de caso donde id_direction no es válido
-    //         return response()->json(['error' => 'Invalid direction ID'], 400);
-    //     }
-
-    //     // Obtener IDs de empleados activos
-    //     $employeeIds = DB::table('public.contracts')
-    //         ->join('public.positions', 'public.contracts.position_id', '=', 'public.positions.id')
-    //         ->join('public.employees', 'public.contracts.employee_id', '=', 'public.employees.id')
-    //         ->join('public.position_groups', 'public.positions.position_group_id', '=', 'public.position_groups.id')
-    //         ->where('public.contracts.active', true)
-    //         ->whereNull('public.contracts.deleted_at')
-    //         ->whereIn('public.position_groups.id', $array)
-    //         ->pluck('public.contracts.employee_id')
-    //         ->toArray();
-
-    //     $consultantEmployeeIds = DB::table('public.consultant_contracts')
-    //         ->join('public.consultant_positions', 'public.consultant_contracts.consultant_position_id', '=', 'public.consultant_positions.id')
-    //         ->join('public.employees', 'public.consultant_contracts.employee_id', '=', 'public.employees.id')
-    //         ->join('public.position_groups', 'public.consultant_positions.position_group_id', '=', 'public.position_groups.id')
-    //         ->where('public.consultant_contracts.active', true)
-    //         ->whereNull('public.consultant_contracts.deleted_at')
-    //         ->whereIn('public.position_groups.id', $array)
-    //         ->pluck('public.consultant_contracts.employee_id')
-    //         ->toArray();
-
-    //     $allEmployeeIds = array_merge($employeeIds, $consultantEmployeeIds);
-
-    //     $query = NoteRequest::with('materials')
-    //         ->whereIn('user_register', $allEmployeeIds)
-    //         ->whereNull('deleted_at');
-
-    //     if ($startDate) {
-    //         $query->where('received_on_date', '>=', $startDate)->where('management_id', '=', $period);
-    //     }
-    //     if ($endDate) {
-    //         $query->where('received_on_date', '<=', $endDate)->where('management_id', '=', $period);
-    //     }
-
-    //     $materials = $query->get()
-    //         ->flatMap(function ($noteRequest) {
-    //             return $noteRequest->materials->map(function ($material) {
-    //                 return [
-    //                     'material_id' => $material->id,
-    //                     'name' => $material->pivot->name_material,
-    //                     'unit_material' => $material->unit_material,
-    //                     'amount_requested' => $material->pivot->delivered_quantity,
-    //                     'cost' => ($material->pivot->delivered_quantity * $material->average_cost),
-    //                 ];
-    //             });
-    //         })
-    //         ->groupBy('material_id')
-    //         ->map(function ($groupedMaterials) {
-    //             $totalAmount = $groupedMaterials->sum('amount_requested');
-    //             $cost_total = $groupedMaterials->sum('cost');
-    //             return [
-    //                 'material_name' => $groupedMaterials->first()['name'],
-    //                 'unit_material' => $groupedMaterials->first()['unit_material'],
-    //                 'total_amount_requested' => $totalAmount,
-    //                 'cost' => $cost_total,
-    //             ];
-    //         })
-    //         ->values();
-
-    //     return response()->json([
-    //         'name' => $name,
-    //         'materials' => $materials
-    //     ]);
-    // }
 
     public function list_users_direction($id_direction)
     {
         $startDate = request()->query('start_date');
         $endDate = request()->query('end_date');
 
-        logger($startDate);
-        logger($endDate);
         $period = Management::latest()->first();
         if (!$period) {
             return response()->json(['error' => 'No management period found'], 404);
         }
-
-        // Obtén el ID del periodo más reciente
         $managementId = $period->id;
 
         if ($id_direction == 1) {

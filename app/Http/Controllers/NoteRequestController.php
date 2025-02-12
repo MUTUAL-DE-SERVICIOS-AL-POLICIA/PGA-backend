@@ -37,7 +37,8 @@ class NoteRequestController extends Controller
         $query = NoteRequest::with(['materials', 'employee'])
             ->where('type_id', 1)
             ->where('management_id', $lastManagement->id)
-            ->orderBy('id', 'desc');
+            ->orderByRaw("CASE WHEN state = 'En Revisión' THEN 0 ELSE 1 END") 
+            ->orderBy('id', 'asc'); 
 
         if ($state) {
             $query->where('state', $state);
@@ -76,6 +77,7 @@ class NoteRequestController extends Controller
             ];
         });
 
+
         return response()->json([
             'status' => 'success',
             'total' => $totalNoteRequests,
@@ -84,6 +86,7 @@ class NoteRequestController extends Controller
             'data' => $response,
         ], 200);
     }
+
 
     public function listUserNoteRequests($userId)
     {
@@ -175,16 +178,20 @@ class NoteRequestController extends Controller
                     $costUnit = $entryMaterialPivot->cost_unit;
                     if ($availableAmount >= $amountToDeliver) {
                         $entryMaterialPivot->request -= $amountToDeliver;
+                        $costDetailsOne[] = "$amountToDeliver @ $costUnit";
                         $costDetails[] = $amountToDeliver * $costUnit;
                         $entryMaterialPivot->save();
                         break;
                     } else {
                         $amountToDeliver -= $availableAmount;
+                        $costDetailsOne[] = "$amountToDeliver @ $costUnit";
                         $costDetails[] = $availableAmount * $costUnit;
                         $entryMaterialPivot->request = 0;
                         $entryMaterialPivot->save();
                     }
                 }
+
+                $costDetailsStr = implode(', ', $costDetailsOne);
 
                 $costDetailsString = array_sum($costDetails);
 
@@ -288,8 +295,6 @@ class NoteRequestController extends Controller
                            and cp.id = cc.consultant_position_id 
                            order by cc.consultant_position_id desc 
                            limit 1', [$note_request->user_register]);
-
-                // Asigna solo el nombre de la posición o un valor nulo si no se encuentra
                 $positionName = $position ? $position->name : null;
                 $employee = Employee::find($note_request->user_register);
                 $file_title = 'SOLICITUD DE MATERIAL DE ALMACÉN';
@@ -326,7 +331,6 @@ class NoteRequestController extends Controller
     {
         $user = User::where('employee_id', $note_request->user_register)->first();
         if ($user) {
-            // $position = $user->position;
             $cargo = DB::table('public.contracts as c')
                 ->join('public.positions as p', 'c.position_id', '=', 'p.id')
                 ->join('public.employees as e', 'c.employee_id', '=', 'e.id')
@@ -356,7 +360,8 @@ class NoteRequestController extends Controller
                     'description' => $material->description,
                     'unit_material' => $material->unit_material,
                     'amount_request' => $material->pivot->amount_request,
-                    'cost_unit' => $material->average_cost,
+                    'cost_unit' => number_format($material->pivot->costDetails / $material->pivot->delivered_quantity, 2, '.', ''),
+                    'cost_total' => $material->pivot->costDetails,
                     'delivered_quantity' => $material->pivot->delivered_quantity,
                 ];
             });
@@ -394,8 +399,6 @@ class NoteRequestController extends Controller
                            and cp.id = cc.consultant_position_id 
                            order by cc.consultant_position_id desc 
                            limit 1', [$note_request->user_register]);
-
-                // Asigna solo el nombre de la posición o un valor nulo si no se encuentra
                 $positionName = $position ? $position->name : null;
                 $employee = Employee::find($note_request->user_register);
                 $file_title = 'SOLICITUD DE MATERIAL DE ALMACÉN';
@@ -404,7 +407,8 @@ class NoteRequestController extends Controller
                         'description' => $material->description,
                         'unit_material' => $material->unit_material,
                         'amount_request' => $material->pivot->amount_request,
-                        'cost_unit' => $material->average_cost,
+                        'cost_unit' => number_format($material->pivot->costDetails / $material->pivot->delivered_quantity, 2, '.', ''),
+                        'cost_total' => $material->pivot->costDetails,
                         'delivered_quantity' => $material->pivot->delivered_quantity,
                     ];
                 });
