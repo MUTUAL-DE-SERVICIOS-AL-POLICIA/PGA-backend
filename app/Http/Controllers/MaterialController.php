@@ -66,7 +66,7 @@ class MaterialController extends Controller
                 $lastCorrelativo = (int) str_replace($group->code, '', $lastMaterial->code_material);
 
                 $newCorrelativo = $lastCorrelativo + 1;
-                logger($newCorrelativo);
+                
             } else {
                 // Si no hay materiales previos, comenzamos desde 1
                 $newCorrelativo = 1;

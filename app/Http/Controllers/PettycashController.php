@@ -48,8 +48,6 @@ class PettycashController extends Controller
             ];
         });
         $fund = Fund::latest()->first();
-        logger($fund->received_amount);
-
         return [
             'products' => $products->values(),
             'groups_summary' => $groupsSummary,
@@ -92,7 +90,6 @@ class PettycashController extends Controller
         });
 
         $fund = Fund::where('id', $request->idFund)->first();
-        logger($fund->received_amount);
 
         $data = [
             'title' => 'PLANILLA DE RENDICIÓN DE CUENTAS',
@@ -281,7 +278,6 @@ class PettycashController extends Controller
         $date_day = Carbon::now()->format('Y-m-d');
         $date_send = Carbon::parse($date_day)->locale('es')->isoFormat('DD [de] MMMM [de] YYYY');
         $date = Carbon::parse($fund->reception_date)->locale('es')->isoFormat('DD [de] MMMM [de] YYYY');
-        logger($date_send);
 
         $data = [
             'title' => 'ORDEN DE PAGO',

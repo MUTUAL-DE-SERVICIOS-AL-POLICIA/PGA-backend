@@ -2,7 +2,7 @@
 
 use \Milon\Barcode\DNS2D;
 
-$max_requests = 10;
+$max_requests = 14;
 
 $dns = new DNS2D();
 $hasCajaChica = collect($materials)->contains(function ($material) {
@@ -20,12 +20,13 @@ $hasCajaChica = collect($materials)->contains(function ($material) {
     <style>
         @page {
             size: letter;
-            margin: 1.5cm;
+            margin: 1.5cm 1.5cm 1.5cm 1.5cm;
         }
 
         body {
             font-size: 12px;
-            /* Cambia según sea necesario */
+            margin-top: 0.5cm;
+            margin-bottom: 0.5cm;
         }
 
         .scissors-rule {
@@ -83,7 +84,7 @@ $hasCajaChica = collect($materials)->contains(function ($material) {
 
 <body style="border: 0; border-radius: 0;">
     @for($it = 0; $it<2; $it++)
-        <table class="w-100 uppercase" >
+        <table class="w-100 uppercase">
         <tr>
             <th class="w-25 text-left no-paddings no-margins align-middle">
                 <div class="text-left">
@@ -151,7 +152,7 @@ $hasCajaChica = collect($materials)->contains(function ($material) {
                         <td class="text-center">{{$material['amount_request']}}</td>
                         <td class="text-center">{{$material['delivered_quantity']}}</td>
                         <td class="text-center">{{$material['cost_unit']}}</td>
-                        <td class="text-center">{{number_format($material['cost_unit'] * $material['delivered_quantity'], 2)}}</td>
+                        <td class="text-center">{{number_format($material['cost_total'], 2)}}</td>
                     </tr>
                     @endforeach
                     @for($i = sizeof($materials) + 1; $i <= $max_requests; $i++)
@@ -161,7 +162,7 @@ $hasCajaChica = collect($materials)->contains(function ($material) {
                         @endfor
                         <tr>
                             <td class="text-center" colspan="6"><strong>TOTAL</strong></td>
-                            <td class="text-center"><strong>{{ number_format($materials->sum(function($material) {return $material['cost_unit'] * $material['delivered_quantity'];}), 2) }}</strong></td>
+                            <td class="text-center"><strong>{{ number_format($materials->sum(function($material) {return $material['cost_total'];}), 2) }}</strong></td>
                         </tr>
                 </tbody>
             </table>

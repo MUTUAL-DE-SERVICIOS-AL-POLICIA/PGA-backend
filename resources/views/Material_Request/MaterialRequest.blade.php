@@ -2,7 +2,7 @@
 
 use \Milon\Barcode\DNS2D;
 
-$max_requests = 10;
+$max_requests = 14;
 
 $dns = new DNS2D();
 ?>
@@ -17,12 +17,13 @@ $dns = new DNS2D();
     <style>
         @page {
             size: letter;
-            margin: 1.5cm;
+            margin: 1.5cm 1.5cm 1.5cm 1.5cm;
         }
 
         body {
             font-size: 12px;
-            /* Cambia según sea necesario */
+            margin-top: 0.5cm;
+            margin-bottom: 0.5cm;
         }
 
         .scissors-rule {
@@ -150,7 +151,6 @@ $dns = new DNS2D();
                     </tr>
                     @endforeach
 
-                    <!-- Nueva fila para la suma total -->
                     @for($i = sizeof($materials) + 1; $i <= $max_requests; $i++)
                         <tr>
                         <td class="text-center" colspan="6">&nbsp;</td>
