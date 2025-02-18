@@ -28,9 +28,6 @@ class ReportController extends Controller
             $stock = 0;
             $totalValuation = 0;
             $max_total = 0;
-
-            // $entries = $material->noteEntries()->where('management_id', $latestManagement->id)->orderBy('delivery_date', 'asc')->get();
-            // $requests = $material->noteRequests()->where('management_id', $latestManagement->id)->where('state', '=', 'Aceptado')->orderBy('received_on_date', 'asc')->get();
             $entries = $material->noteEntries()
                 ->where('management_id', $latestManagement->id)
                 ->where('delivery_date', '<=', $endDate)
@@ -311,6 +308,139 @@ class ReportController extends Controller
         ]);
     }
 
+    // public function kardexGeneral()
+    // {
+    //     try {
+    //         $materials = Material::all();
+    //         $kardexGeneral = [];
+
+    //         foreach ($materials as $material) {
+    //             $stock = 0;
+    //             $totalValuation = 0;
+
+    //             $entries = $material->noteEntries()->orderBy('delivery_date', 'asc')->get();
+    //             $requests = $material->noteRequests()->where('state', '=', 'Aceptado')->orderBy('received_on_date', 'asc')->get();
+
+    //             $movements = [];
+
+    //             foreach ($entries as $entry) {
+    //                 $movements[] = [
+    //                     'date' => $entry->pivot->created_at,
+    //                     'type' => 'entry',
+    //                     'description' => $entry->name_supplier . ' - Nota de Entrada #' . $entry->number_note,
+    //                     'quantity' => $entry->pivot->amount_entries,
+    //                     'cost_unit' => number_format($entry->pivot->cost_unit, 2),
+    //                 ];
+    //             }
+
+    //             foreach ($requests as $request) {
+    //                 $employee = Employee::find($request->user_register);
+    //                 $movements[] = [
+    //                     'date' => $request->pivot->created_at,
+    //                     'type' => 'exit',
+    //                     'description' => ucwords(strtolower("{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}")) . ' - Solicitud #' . $request->id,
+    //                     'quantity' => $request->pivot->delivered_quantity,
+    //                     'cost_unit' => null,
+    //                 ];
+    //             }
+    //             if (count($movements) === 0) {
+    //                 continue;
+    //             }
+    //             usort($movements, function ($a, $b) {
+    //                 return strtotime($b['date']) - strtotime($a['date']);
+    //             });
+
+    //             $fifoQueue = [];
+    //             $kardex = [];
+
+    //             foreach ($movements as $movement) {
+    //                 if ($movement['type'] === 'entry') {
+    //                     $fifoQueue[] = [
+    //                         'quantity' => $movement['quantity'],
+    //                         'cost_unit' => $movement['cost_unit'],
+    //                     ];
+    //                     $stock += $movement['quantity'];
+    //                     $totalValuation += $movement['quantity'] * $movement['cost_unit'];
+
+    //                     $kardex[] = [
+    //                         'date' => date('Y-m-d', strtotime($movement['date'])),
+    //                         'material' => $material->description,
+    //                         'description' => $movement['description'],
+    //                         'entradas' => $movement['quantity'],
+    //                         'salidas' => 0,
+    //                         'stock_fisico' => $stock,
+    //                         'cost_unit' => number_format($movement['cost_unit'], 2),
+    //                         'cost_total' => number_format(max($totalValuation, 0), 2),
+    //                     ];
+    //                 } elseif ($movement['type'] === 'exit') {
+    //                     $quantityToDeliver = $movement['quantity'];
+    //                     $costTotal = 0;
+
+    //                     while ($quantityToDeliver > 0 && count($fifoQueue) > 0) {
+    //                         $fifoItem = array_shift($fifoQueue);
+
+    //                         if ($fifoItem['quantity'] > $quantityToDeliver) {
+    //                             $costUnit = $fifoItem['cost_unit'];
+    //                             $costTotal += $quantityToDeliver * $costUnit;
+
+    //                             $kardex[] = [
+    //                                 'date' => date('Y-m-d', strtotime($movement['date'])),
+    //                                 'material' => $material->description,
+    //                                 'description' => $movement['description'],
+    //                                 'entradas' => 0,
+    //                                 'salidas' => $quantityToDeliver,
+    //                                 'stock_fisico' => $stock - $quantityToDeliver,
+    //                                 'cost_unit' => number_format($costUnit, 2),
+    //                                 'cost_total' => number_format(max($totalValuation - $costTotal, 0), 2),
+    //                             ];
+
+    //                             $fifoItem['quantity'] -= $quantityToDeliver;
+    //                             array_unshift($fifoQueue, $fifoItem);
+    //                             $stock -= $quantityToDeliver;
+    //                             $totalValuation = max($totalValuation - $costTotal, 0);
+    //                             $quantityToDeliver = 0;
+    //                         } else {
+    //                             $costUnit = $fifoItem['cost_unit'];
+    //                             $costTotal += $fifoItem['quantity'] * $costUnit;
+
+    //                             $kardex[] = [
+    //                                 'date' => date('Y-m-d', strtotime($movement['date'])),
+    //                                 'material' => $material->description,
+    //                                 'description' => $movement['description'],
+    //                                 'entradas' => 0,
+    //                                 'salidas' => $fifoItem['quantity'],
+    //                                 'stock_fisico' => $stock - $fifoItem['quantity'],
+    //                                 'cost_unit' => number_format($costUnit, 2),
+    //                                 'cost_total' => number_format(max($totalValuation - $costTotal, 0), 2),
+    //                             ];
+
+    //                             $quantityToDeliver -= $fifoItem['quantity'];
+    //                             $stock -= $fifoItem['quantity'];
+    //                             $totalValuation = max($totalValuation - $costTotal, 0);
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //             if (!empty($kardex)) {
+    //                 $kardexGeneral = array_merge($kardexGeneral, $kardex);
+    //             }
+    //         }
+    //         usort($kardexGeneral, function ($a, $b) {
+    //             return strtotime($b['date']) - strtotime($a['date']);
+    //         });
+    //         $kardexGeneral = array_slice($kardexGeneral, 0, 10);
+
+    //         return response()->json($kardexGeneral);
+    //     } catch (\Exception $e) {
+    //         return response()->json([
+    //             'error' => 'No se pudo generar el Kardex general',
+    //             'message' => $e->getMessage(),
+    //             'line' => $e->getLine(),
+    //             'file' => $e->getFile()
+    //         ], 500);
+    //     }
+    // }
+
     public function kardexGeneral()
     {
         try {
@@ -327,28 +457,35 @@ class ReportController extends Controller
                 $movements = [];
 
                 foreach ($entries as $entry) {
+                    $quantity = is_numeric($entry->pivot->amount_entries) ? floatval($entry->pivot->amount_entries) : 0;
+                    $costUnit = is_numeric($entry->pivot->cost_unit) ? floatval($entry->pivot->cost_unit) : 0;
+
                     $movements[] = [
                         'date' => $entry->pivot->created_at,
                         'type' => 'entry',
                         'description' => $entry->name_supplier . ' - Nota de Entrada #' . $entry->number_note,
-                        'quantity' => $entry->pivot->amount_entries,
-                        'cost_unit' => number_format($entry->pivot->cost_unit, 2),
+                        'quantity' => $quantity,
+                        'cost_unit' => $costUnit,
                     ];
                 }
 
                 foreach ($requests as $request) {
                     $employee = Employee::find($request->user_register);
+                    $quantity = is_numeric($request->pivot->delivered_quantity) ? floatval($request->pivot->delivered_quantity) : 0;
+
                     $movements[] = [
                         'date' => $request->pivot->created_at,
                         'type' => 'exit',
                         'description' => ucwords(strtolower("{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}")) . ' - Solicitud #' . $request->id,
-                        'quantity' => $request->pivot->delivered_quantity,
+                        'quantity' => $quantity,
                         'cost_unit' => null,
                     ];
                 }
+
                 if (count($movements) === 0) {
                     continue;
                 }
+
                 usort($movements, function ($a, $b) {
                     return strtotime($b['date']) - strtotime($a['date']);
                 });
@@ -362,6 +499,7 @@ class ReportController extends Controller
                             'quantity' => $movement['quantity'],
                             'cost_unit' => $movement['cost_unit'],
                         ];
+
                         $stock += $movement['quantity'];
                         $totalValuation += $movement['quantity'] * $movement['cost_unit'];
 
@@ -381,9 +519,9 @@ class ReportController extends Controller
 
                         while ($quantityToDeliver > 0 && count($fifoQueue) > 0) {
                             $fifoItem = array_shift($fifoQueue);
+                            $costUnit = is_numeric($fifoItem['cost_unit']) ? floatval($fifoItem['cost_unit']) : 0;
 
                             if ($fifoItem['quantity'] > $quantityToDeliver) {
-                                $costUnit = $fifoItem['cost_unit'];
                                 $costTotal += $quantityToDeliver * $costUnit;
 
                                 $kardex[] = [
@@ -403,7 +541,6 @@ class ReportController extends Controller
                                 $totalValuation = max($totalValuation - $costTotal, 0);
                                 $quantityToDeliver = 0;
                             } else {
-                                $costUnit = $fifoItem['cost_unit'];
                                 $costTotal += $fifoItem['quantity'] * $costUnit;
 
                                 $kardex[] = [
@@ -424,20 +561,29 @@ class ReportController extends Controller
                         }
                     }
                 }
+
                 if (!empty($kardex)) {
                     $kardexGeneral = array_merge($kardexGeneral, $kardex);
                 }
             }
+
             usort($kardexGeneral, function ($a, $b) {
                 return strtotime($b['date']) - strtotime($a['date']);
             });
+
             $kardexGeneral = array_slice($kardexGeneral, 0, 10);
 
             return response()->json($kardexGeneral);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'No se pudo generar el Kardex general'], 500);
+            return response()->json([
+                'error' => 'No se pudo generar el Kardex general',
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile()
+            ], 500);
         }
     }
+
 
     public function ValuedPhysical(Request $request)
     {

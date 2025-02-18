@@ -151,8 +151,8 @@ $hasCajaChica = collect($materials)->contains(function ($material) {
                         <td class="text-center">{{$material['unit_material']}}</td>
                         <td class="text-center">{{$material['amount_request']}}</td>
                         <td class="text-center">{{$material['delivered_quantity']}}</td>
-                        <td class="text-center">{{$material['cost_unit']}}</td>
-                        <td class="text-center">{{number_format($material['cost_total'], 2)}}</td>
+                        <td class="text-right">{{$material['cost_unit']}}</td>
+                        <td class="text-right">{{number_format($material['cost_total'], 2)}}</td>
                     </tr>
                     @endforeach
                     @for($i = sizeof($materials) + 1; $i <= $max_requests; $i++)

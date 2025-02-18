@@ -146,8 +146,8 @@ $dns = new DNS2D();
                         <td class="text-center">{{$material['description']}}</td>
                         <td class="text-center">{{$material['unit_material']}}</td>
                         <td class="text-center">{{$material['amount_request']}}</td>
-                        <td class="text-center">{{$material['cost_unit']}}</td>
-                        <td class="text-center">{{ number_format($material['cost_unit'] * $material['amount_request'], 2) }}</td>
+                        <td class="text-right">{{$material['cost_unit']}}</td>
+                        <td class="text-right">{{ number_format($material['cost_unit'] * $material['amount_request'], 2) }}</td>
                     </tr>
                     @endforeach
 

@@ -66,7 +66,6 @@ class MaterialController extends Controller
                 $lastCorrelativo = (int) str_replace($group->code, '', $lastMaterial->code_material);
 
                 $newCorrelativo = $lastCorrelativo + 1;
-                
             } else {
                 // Si no hay materiales previos, comenzamos desde 1
                 $newCorrelativo = 1;
@@ -172,28 +171,35 @@ class MaterialController extends Controller
 
     public function materialslist(Request $request)
     {
-        $page = max(0, $request->get('page', 0));
-        $limit = max(1, $request->get('limit', Material::count()));
+        $page = max(0, (int) $request->get('page', 0));
+        $limit = max(1, (int) $request->get('limit', Material::count()));
         $start = $page * $limit;
 
         $search = $request->input('search', '');
+        $stateFilter = $request->input('state', ''); 
 
-        $query = Material::orderBy('state')->orderBy('stock');
-        if ($search) {
-            $query->where('description', 'like', '%' . $search . '%')
-                ->orWhere('code_material', 'like', '%' . $search . '%');
+        $query = Material::query()->orderBy('state')->orderBy('stock');
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('description', 'like', '%' . $search . '%')
+                    ->orWhere('code_material', 'like', '%' . $search . '%');
+            });
+        }
+
+        if (!empty($stateFilter) && in_array($stateFilter, ['Habilitado', 'Inhabilitado'])) {
+            $query->where('state', $stateFilter);
         }
 
         $totalMaterials = $query->count();
 
         $materials = $query->skip($start)->take($limit)->get();
 
-        $materials->each(function ($material) {
-            if ($material->stock <= 0 && $material->state !== 'Inhabilitado') {
+        foreach ($materials as $material) {
+            if ($material->stock <= 0 && $material->state === 'Habilitado') {
                 $material->state = 'Inhabilitado';
                 $material->save();
             }
-        });
+        }
 
         return response()->json([
             'status' => 'success',
@@ -203,6 +209,7 @@ class MaterialController extends Controller
             'materials' => $materials,
         ]);
     }
+
 
     public function list_materials_pva()
     {

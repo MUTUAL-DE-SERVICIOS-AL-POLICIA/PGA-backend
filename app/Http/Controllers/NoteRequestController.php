@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\Ldap;
 use App\Models\Employee;
 use App\Models\Entrie_Material;
 use App\Models\Entry;
@@ -24,6 +25,7 @@ class NoteRequestController extends Controller
         $limit = max(1, $request->get('limit', NoteRequest::count()));
         $start = $page * $limit;
         $state = $request->input('state', '');
+        $search = $request->input('search', '');
 
         $lastManagement = Management::orderByDesc('id')->first();
 
@@ -37,11 +39,21 @@ class NoteRequestController extends Controller
         $query = NoteRequest::with(['materials', 'employee'])
             ->where('type_id', 1)
             ->where('management_id', $lastManagement->id)
-            ->orderByRaw("CASE WHEN state = 'En Revisión' THEN 0 ELSE 1 END") 
-            ->orderBy('id', 'asc'); 
+            ->orderByRaw("
+            CASE 
+                WHEN state = 'En Revision' THEN 0 
+                ELSE 1 
+            END, id ASC
+        ");
 
         if ($state) {
             $query->where('state', $state);
+        }
+
+        if (!empty($search)) {
+            $query->whereHas('employee', function ($q) use ($search) {
+                $q->whereRaw("CONCAT(first_name, ' ', last_name, ' ', mothers_last_name) LIKE ?", ["%{$search}%"]);
+            });
         }
 
         $totalNoteRequests = $query->count();
@@ -77,7 +89,6 @@ class NoteRequestController extends Controller
             ];
         });
 
-
         return response()->json([
             'status' => 'success',
             'total' => $totalNoteRequests,
@@ -86,7 +97,6 @@ class NoteRequestController extends Controller
             'data' => $response,
         ], 200);
     }
-
 
     public function listUserNoteRequests($userId)
     {
@@ -209,10 +219,11 @@ class NoteRequestController extends Controller
             $number_note = NoteRequest::where('state', 'Aceptado')->count() + 1;
             $noteRequest = NoteRequest::find($noteRequestId);
             $noteRequest->state = 'Aceptado';
+            $noteRequest->observation = $request->comment;
             $noteRequest->received_on_date = today()->toDateString();
             $noteRequest->number_note = $number_note;
             $noteRequest->save();
-            return response()->json(['status' => true, 'message' => 'Solicitud Aceptada'], 200);
+            return response()->json(['note' => $noteRequest, 'status' => true, 'message' => 'Solicitud Aceptada'], 200);
         } else {
 
             $noteRequestId = $request->input('noteRequestId');
@@ -229,28 +240,7 @@ class NoteRequestController extends Controller
 
         $user = User::where('employee_id', $note_request->user_register)->first();
         if ($user) {
-            $cargo = DB::table('public.contracts as c')
-                ->join('public.positions as p', 'c.position_id', '=', 'p.id')
-                ->join('public.employees as e', 'c.employee_id', '=', 'e.id')
-                ->join('public.position_groups as pg', 'p.position_group_id', '=', 'pg.id')
-                ->select('c.employee_id', 'e.first_name', 'e.last_name', 'e.mothers_last_name', 'p.name as position_name', 'pg.name as group_name', 'pg.id as group_id')
-                ->where('c.active', true)
-                ->whereNull('c.deleted_at')
-                ->whereIn('pg.id', [7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
-                ->where('c.employee_id', $note_request->user_register)
-                ->unionAll(
-                    DB::table('public.consultant_contracts as cc')
-                        ->join('public.consultant_positions as cp', 'cc.consultant_position_id', '=', 'cp.id')
-                        ->join('public.employees as e', 'cc.employee_id', '=', 'e.id')
-                        ->join('public.position_groups as pg', 'cp.position_group_id', '=', 'pg.id')
-                        ->select('cc.employee_id', 'e.first_name', 'e.last_name', 'e.mothers_last_name', 'cp.name as position_name', 'pg.name as group_name', 'pg.id as group_id')
-                        ->where('cc.active', true)
-                        ->whereNull('cc.deleted_at')
-                        ->whereIn('pg.id', [7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
-                        ->where('cc.employee_id', $note_request->user_register)
-                )
-                ->get();
-            $positionName = isset($cargo[0]) ? $cargo[0]->position_name : null;
+            $positionName = $this->titlePerson($note_request->user_register);
             $employee = Employee::find($note_request->user_register);
             $file_title = 'SOLICITUD DE MATERIAL DE ALMACÉN';
             $materials = $note_request->materials()->get()->map(function ($material) {
@@ -265,7 +255,7 @@ class NoteRequestController extends Controller
             $data = [
                 'title' => 'SOLICITUD DE MATERIAL DE ALMACÉN',
                 'number_note' => $note_request->number_note,
-                'date' => Carbon::now()->format('Y'),
+                'date' => Carbon::parse($note_request->request_date)->format('d-m-Y'),
                 'employee' => $employee
                     ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}"
                     : null,
@@ -289,13 +279,7 @@ class NoteRequestController extends Controller
         } else {
             $employee = Employee::where('id', $note_request->user_register)->first();
             if ($employee) {
-                $position = DB::selectOne('select cp."name" 
-                           from public.consultant_contracts cc, public.consultant_positions cp 
-                           where cc.employee_id = ? 
-                           and cp.id = cc.consultant_position_id 
-                           order by cc.consultant_position_id desc 
-                           limit 1', [$note_request->user_register]);
-                $positionName = $position ? $position->name : null;
+                $positionName = $this->titlePerson($note_request->user_register);
                 $employee = Employee::find($note_request->user_register);
                 $file_title = 'SOLICITUD DE MATERIAL DE ALMACÉN';
                 $materials = $note_request->materials()->get()->map(function ($material) {
@@ -310,7 +294,7 @@ class NoteRequestController extends Controller
                 $data = [
                     'title' => 'SOLICITUD DE MATERIAL DE ALMACÉN',
                     'number_note' => $note_request->number_note,
-                    'date' => Carbon::now()->format('Y'),
+                    'date' => Carbon::parse($note_request->request_date)->format('d-m-Y'),
                     'employee' => $employee
                         ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}"
                         : null,
@@ -331,28 +315,7 @@ class NoteRequestController extends Controller
     {
         $user = User::where('employee_id', $note_request->user_register)->first();
         if ($user) {
-            $cargo = DB::table('public.contracts as c')
-                ->join('public.positions as p', 'c.position_id', '=', 'p.id')
-                ->join('public.employees as e', 'c.employee_id', '=', 'e.id')
-                ->join('public.position_groups as pg', 'p.position_group_id', '=', 'pg.id')
-                ->select('c.employee_id', 'e.first_name', 'e.last_name', 'e.mothers_last_name', 'p.name as position_name', 'pg.name as group_name', 'pg.id as group_id')
-                ->where('c.active', true)
-                ->whereNull('c.deleted_at')
-                ->whereIn('pg.id', [7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
-                ->where('c.employee_id', $note_request->user_register)
-                ->unionAll(
-                    DB::table('public.consultant_contracts as cc')
-                        ->join('public.consultant_positions as cp', 'cc.consultant_position_id', '=', 'cp.id')
-                        ->join('public.employees as e', 'cc.employee_id', '=', 'e.id')
-                        ->join('public.position_groups as pg', 'cp.position_group_id', '=', 'pg.id')
-                        ->select('cc.employee_id', 'e.first_name', 'e.last_name', 'e.mothers_last_name', 'cp.name as position_name', 'pg.name as group_name', 'pg.id as group_id')
-                        ->where('cc.active', true)
-                        ->whereNull('cc.deleted_at')
-                        ->whereIn('pg.id', [7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
-                        ->where('cc.employee_id', $note_request->user_register)
-                )
-                ->get();
-            $positionName = isset($cargo[0]) ? $cargo[0]->position_name : null;
+            $positionName = $this->titlePerson($note_request->user_register);
             $employee = Employee::find($note_request->user_register);
             $file_title = 'SOLICITUD DE MATERIAL DE ALMACÉN';
             $materials = $note_request->materials()->get()->map(function ($material) {
@@ -360,7 +323,9 @@ class NoteRequestController extends Controller
                     'description' => $material->description,
                     'unit_material' => $material->unit_material,
                     'amount_request' => $material->pivot->amount_request,
-                    'cost_unit' => number_format($material->pivot->costDetails / $material->pivot->delivered_quantity, 2, '.', ''),
+                    'cost_unit' => $material->pivot->delivered_quantity > 0
+                        ? number_format($material->pivot->costDetails / $material->pivot->delivered_quantity, 2, '.', '')
+                        : '0.00',
                     'cost_total' => $material->pivot->costDetails,
                     'delivered_quantity' => $material->pivot->delivered_quantity,
                 ];
@@ -369,7 +334,7 @@ class NoteRequestController extends Controller
             $data = [
                 'title' => 'ENTREGA DE MATERIAL DE ALMACÉN',
                 'number_note' => $note_request->number_note,
-                'date' => Carbon::now()->format('Y'),
+                'date' => Carbon::parse($note_request->received_on_date)->format('d-m-Y'),
                 'employee' => $employee
                     ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}"
                     : null,
@@ -399,7 +364,8 @@ class NoteRequestController extends Controller
                            and cp.id = cc.consultant_position_id 
                            order by cc.consultant_position_id desc 
                            limit 1', [$note_request->user_register]);
-                $positionName = $position ? $position->name : null;
+                // $positionName = $position ? $position->name : null;
+                $positionName = $this->titlePerson($note_request->user_register);
                 $employee = Employee::find($note_request->user_register);
                 $file_title = 'SOLICITUD DE MATERIAL DE ALMACÉN';
                 $materials = $note_request->materials()->get()->map(function ($material) {
@@ -407,16 +373,20 @@ class NoteRequestController extends Controller
                         'description' => $material->description,
                         'unit_material' => $material->unit_material,
                         'amount_request' => $material->pivot->amount_request,
-                        'cost_unit' => number_format($material->pivot->costDetails / $material->pivot->delivered_quantity, 2, '.', ''),
+                        'cost_unit' => $material->pivot->delivered_quantity > 0
+                            ? number_format($material->pivot->costDetails / $material->pivot->delivered_quantity, 2, '.', '')
+                            : '0.00',
                         'cost_total' => $material->pivot->costDetails,
                         'delivered_quantity' => $material->pivot->delivered_quantity,
                     ];
                 });
 
+
+
                 $data = [
                     'title' => 'ENTREGA DE MATERIAL DE ALMACÉN',
                     'number_note' => $note_request->number_note,
-                    'date' => Carbon::now()->format('Y'),
+                    'date' => Carbon::parse($note_request->received_on_date)->format('d-m-Y'),
                     'employee' => $employee
                         ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}"
                         : null,
@@ -508,5 +478,66 @@ class NoteRequestController extends Controller
             'last_page' => ceil($totalNoteRequests / $limit),
             'data' => $response,
         ], 200);
+    }
+
+    public function arreglar_error()
+    {
+        $note_request = NoteRequest::with(['materials:id,code_material,description'])
+            ->where('type_id', 2)
+            ->where('state', "Aceptado")
+            ->get(['id', 'number_note']);
+
+        $note_entrie = Note_Entrie::with(['materials:id,code_material,description'])
+            ->where('type_id', 2)
+            ->get(['id', 'number_note']);
+
+        $data = [
+            'notas_recibidas' => $note_entrie,
+            'notas_entregas' => $note_request,
+        ];
+        $mapping = [
+            159 => 53,
+            160 => 54,
+            161 => 77,
+            162 => 85,
+        ];
+
+        foreach ($data['notas_recibidas'] as &$nota_recibida) {
+            $recibida_id = $nota_recibida->id;
+            $entregada_id = $mapping[$recibida_id] ?? null;
+
+            if ($entregada_id) {
+                $nota_entregada = collect($data['notas_entregas'])->firstWhere('id', $entregada_id);
+
+                if ($nota_entregada) {
+                    foreach ($nota_recibida->materials as &$material_recibido) {
+                        $material_id = $material_recibido->id;
+
+                        $material_entregado = collect($nota_entregada->materials)->firstWhere('id', $material_id);
+
+                        if ($material_entregado && isset($material_entregado->pivot->costDetails)) {
+                            $new_cost = $material_recibido->pivot->cost_total;
+                            $material_entregado->pivot->costDetails = $new_cost;
+                            Request_Material::where('note_id', $entregada_id)
+                                ->where('material_id', $material_id)
+                                ->update(['costDetails' => $new_cost]);
+                        }
+                    }
+                }
+            }
+        }
+        return response()->json($data);
+    }
+
+    public function titlePerson($idPersona)
+    {
+        $ldap = new Ldap();
+        $user = $ldap->get_entry($idPersona, 'id');
+
+        if ($user && isset($user['title'])) {
+            return $user['title'];
+        }
+
+        return null;
     }
 }
