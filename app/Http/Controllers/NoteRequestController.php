@@ -38,13 +38,7 @@ class NoteRequestController extends Controller
 
         $query = NoteRequest::with(['materials', 'employee'])
             ->where('type_id', 1)
-            ->where('management_id', $lastManagement->id)
-            ->orderByRaw("
-            CASE 
-                WHEN state = 'En Revision' THEN 0 
-                ELSE 1 
-            END, id ASC
-        ");
+            ->where('management_id', $lastManagement->id);
 
         if ($state) {
             $query->where('state', $state);
@@ -56,13 +50,26 @@ class NoteRequestController extends Controller
             });
         }
 
-        $totalNoteRequests = $query->count();
-        $noteRequests = $query->skip($start)->take($limit)->get();
+        $noteRequests = $query->get();
+        $totalNoteRequests = $noteRequests->count();
+        $noteRequests = $noteRequests->sortBy(function ($note) {
+            $priority = match ($note->state) {
+                'En Revision' => 0,
+                'Aceptado' => 1,
+                'Cancelado' => 2,
+                default => 3,
+            };
 
-        if ($noteRequests->isEmpty()) {
-            return response()->json(['message' => 'No note requests found'], 404);
-        }
+            $orderWithinGroup = match ($note->state) {
+                'En Revision' => $note->request_date,
+                'Aceptado', 'Cancelado' => - ($note->number_note ?? 0),
+                default => 0,
+            };
 
+            return [$priority, $orderWithinGroup];
+        })->values();
+
+        $noteRequests = $noteRequests->slice($start, $limit)->values();
         $response = $noteRequests->map(function ($noteRequest) {
             return [
                 'id_note' => $noteRequest->id,
@@ -97,6 +104,7 @@ class NoteRequestController extends Controller
             'data' => $response,
         ], 200);
     }
+
 
     public function listUserNoteRequests($userId)
     {
@@ -478,55 +486,6 @@ class NoteRequestController extends Controller
             'last_page' => ceil($totalNoteRequests / $limit),
             'data' => $response,
         ], 200);
-    }
-
-    public function arreglar_error()
-    {
-        $note_request = NoteRequest::with(['materials:id,code_material,description'])
-            ->where('type_id', 2)
-            ->where('state', "Aceptado")
-            ->get(['id', 'number_note']);
-
-        $note_entrie = Note_Entrie::with(['materials:id,code_material,description'])
-            ->where('type_id', 2)
-            ->get(['id', 'number_note']);
-
-        $data = [
-            'notas_recibidas' => $note_entrie,
-            'notas_entregas' => $note_request,
-        ];
-        $mapping = [
-            159 => 53,
-            160 => 54,
-            161 => 77,
-            162 => 85,
-        ];
-
-        foreach ($data['notas_recibidas'] as &$nota_recibida) {
-            $recibida_id = $nota_recibida->id;
-            $entregada_id = $mapping[$recibida_id] ?? null;
-
-            if ($entregada_id) {
-                $nota_entregada = collect($data['notas_entregas'])->firstWhere('id', $entregada_id);
-
-                if ($nota_entregada) {
-                    foreach ($nota_recibida->materials as &$material_recibido) {
-                        $material_id = $material_recibido->id;
-
-                        $material_entregado = collect($nota_entregada->materials)->firstWhere('id', $material_id);
-
-                        if ($material_entregado && isset($material_entregado->pivot->costDetails)) {
-                            $new_cost = $material_recibido->pivot->cost_total;
-                            $material_entregado->pivot->costDetails = $new_cost;
-                            Request_Material::where('note_id', $entregada_id)
-                                ->where('material_id', $material_id)
-                                ->update(['costDetails' => $new_cost]);
-                        }
-                    }
-                }
-            }
-        }
-        return response()->json($data);
     }
 
     public function titlePerson($idPersona)

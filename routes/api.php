@@ -38,9 +38,6 @@ Route::group([
 
     Route::get('/AccountabilitySheet2', [PettycashController::class, 'Print_Accountability_sheet']);
 
-    Route::get('/Arreglar', [NoteRequestController::class, 'arreglar_error']);
-
-
     Route::get('/prueba_note', [NoteEntriesController::class, 'services_note']);
     //Notas de Solicitud
     Route::get('/noteRequest', [NoteRequestController::class, 'list_note_request']);
@@ -48,6 +45,9 @@ Route::group([
     Route::get('/noteRequest/{id_user}', [NoteRequestController::class, 'listUserNoteRequests']);
     Route::post('/createNoteRequest', [NoteRequestController::class, 'create_note_request']);
     Route::get('/printRequest/{note_request}', [NoteRequestController::class, 'print_request']);
+
+    //
+    Route::get('/solucionar', [MaterialController::class, 'actualizar_grupos']);
 
 
     Route::group(['middleware' => ['auth:sanctum']], function () {
