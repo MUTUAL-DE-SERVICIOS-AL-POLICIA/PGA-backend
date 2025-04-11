@@ -190,6 +190,8 @@ class MaterialController extends Controller
             $query->where('state', $stateFilter);
         }
 
+        logger($query->get());
+
         $totalMaterials = $query->count();
 
         $materials = $query->skip($start)->take($limit)->get();
@@ -221,7 +223,7 @@ class MaterialController extends Controller
     {
         $material = Material::find($id);
 
-
+        $material->code_material = $request['code_material'];
         $material->description = $request['description'];
         $material->unit_material = $request['unit_material'];
 
@@ -230,35 +232,5 @@ class MaterialController extends Controller
     }
 
 
-    //SOLO DEBERIA UTILIZARSE UNA VEZ 
-
-    public function actualizar_grupos()
-    {
-
-        $date = Material::where('id', 49)->first();
-
-        if ($date->group_id == 18) {
-            $materials = Material::where('type', 'Caja Chica, Fondo de Avance, Reposiciones')->whereBetween('group_id', [18, 30])->orderBy('group_id')->get();
-            foreach ($materials as $material) {
-                $material->group_id += 1;
-                $material->save();
-            }
     
-            $material = Material::create([
-                'group_id' => 18,
-                'code_material' => 346001,
-                'description' => '34600 - PRODUCTOS METALICOS (CAJA CHICA)',
-                'unit_material' => 'GLOBAL',
-                'barcode' => 10491,
-                'stock' => 0,
-                'state' => 'Inhabilitado',
-                'min' => 5,
-                'type' => 'Caja Chica, Fondo de Avance, Reposiciones',
-            ]);
-            return $materials;
-        }else{
-            return false;
-        }
-
-    }
 }
