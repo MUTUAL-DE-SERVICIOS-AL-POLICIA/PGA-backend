@@ -439,20 +439,33 @@ class NoteRequestController extends Controller
 
         $query = NoteRequest::with(['materials', 'employee'])
             ->where('type_id', 2)
-            ->where('management_id', $lastManagement->id)
-            ->orderBy('id', 'desc');
+            ->where('management_id', $lastManagement->id);
+
 
         if ($state) {
             $query->where('state', $state);
         }
 
-        $totalNoteRequests = $query->count();
-        $noteRequests = $query->skip($start)->take($limit)->get();
+        $noteRequests = $query->get();
+        $totalNoteRequests = $noteRequests->count();
+        $noteRequests = $noteRequests->sortBy(function ($note) {
+            $priority = match ($note->state) {
+                'En Revision' => 0,
+                'Aceptado' => 1,
+                'Cancelado' => 2,
+                default => 3,
+            };
 
-        if ($noteRequests->isEmpty()) {
-            return response()->json(['message' => 'No note requests found'], 404);
-        }
+            $orderWithinGroup = match ($note->state) {
+                'En Revision' => $note->request_date,
+                'Aceptado', 'Cancelado' => - ($note->number_note ?? 0),
+                default => 0,
+            };
 
+            return [$priority, $orderWithinGroup];
+        })->values();
+
+        $noteRequests = $noteRequests->slice($start, $limit)->values();
         $response = $noteRequests->map(function ($noteRequest) {
             return [
                 'id_note' => $noteRequest->id,
@@ -460,6 +473,7 @@ class NoteRequestController extends Controller
                 'state' => $noteRequest->state,
                 'request_date' => $noteRequest->request_date,
                 'observation' => $noteRequest->observation,
+                'observation_request' => $noteRequest->observation_request,
                 'employee' => $noteRequest->employee
                     ? "{$noteRequest->employee->first_name} {$noteRequest->employee->last_name} {$noteRequest->employee->mothers_last_name}"
                     : null,
@@ -478,7 +492,6 @@ class NoteRequestController extends Controller
             ];
         });
 
-
         return response()->json([
             'status' => 'success',
             'total' => $totalNoteRequests,
@@ -486,6 +499,7 @@ class NoteRequestController extends Controller
             'last_page' => ceil($totalNoteRequests / $limit),
             'data' => $response,
         ], 200);
+
     }
 
     public function titlePerson($idPersona)

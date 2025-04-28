@@ -13,6 +13,7 @@ use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\TypeController;
 use App\Http\Controllers\UserLdapController;
 use Illuminate\Support\Facades\Route;
+use Laravel\Prompts\Note;
 
 Route::group([
     'middleware' => 'api',
@@ -34,6 +35,7 @@ Route::group([
     Route::get('/list_group', [ProductController::class, 'list_group']);
     Route::post('/savePettyCashDetails', [ProductController::class, 'save_petty_cash']);
     Route::post('/personal_transpor_tickets', [ProductController::class, 'create_note_tickets']);
+    Route::get('/controlNote', [NoteEntriesController::class, 'controlNote']);
 
 
     Route::get('/AccountabilitySheet2', [PettycashController::class, 'Print_Accountability_sheet']);

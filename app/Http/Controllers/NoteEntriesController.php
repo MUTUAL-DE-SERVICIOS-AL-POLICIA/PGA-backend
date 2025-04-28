@@ -8,6 +8,7 @@ use App\Models\Management;
 use App\Models\Material;
 use App\Models\Note_Entrie;
 use App\Models\NoteRequest;
+use App\Models\Request_Material;
 use App\Models\Supplier;
 use App\Models\Type;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -311,5 +312,19 @@ class NoteEntriesController extends Controller
             ]);
         }
         return response()->json($noteRequest->load('materials'), 201);
+    }
+
+    public function controlNote()
+    {
+        $note1 = Request_Material::find(1587);
+        $note2 = Request_Material::find(1590);
+        if (!$note1 || !$note2) {
+            return;
+        }
+        $tempCost = $note1->costDetails;
+        $note1->costDetails = $note2->costDetails;
+        $note2->costDetails = $tempCost;
+        $note1->save();
+        $note2->save();
     }
 }
