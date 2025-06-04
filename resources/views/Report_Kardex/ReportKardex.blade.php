@@ -115,28 +115,17 @@ $dns = new DNS2D();
                         <td class="text-center">{{$kardex['entradas']}}</td>
                         <td class="text-center">{{$kardex['salidas']}}</td>
                         <td class="text-center">{{$kardex['stock_fisico']}}</td>
-                        <td class="text-right">{{$kardex['cost_unit']}}</td>
+                        <td class="text-right">{{ number_format($kardex['cost_unit'], 2) }}</td>
                         <td class="text-right">
-                            @if($kardex['entradas'])
-                            {{ number_format($kardex['entradas'] * $kardex['cost_unit'], 2) }}
-                            @else
-                            ---
-                            @endif
+                            {{ $kardex['importe_entrada'] ? number_format($kardex['importe_entrada'], 2) : '---' }}
                         </td>
                         <td class="text-right">
-                            @if($kardex['salidas'])
-                            {{ number_format($kardex['salidas'] * $kardex['cost_unit'], 2) }}
-                            @else
-                            ---
-                            @endif
+                            {{ $kardex['importe_salida'] ? number_format($kardex['importe_salida'], 2) : '---' }}
                         </td>
                         <td class="text-right">
-                            @if($kardex['entradas'] || $kardex['salidas'])
-                            {{$kardex['cost_total']}}
-                            @else
-                            ---
-                            @endif
+                            {{ $kardex['importe_saldo'] ? number_format($kardex['importe_saldo'], 2) : '---' }}
                         </td>
+
                     </tr>
                     @endforeach
                 </tbody>

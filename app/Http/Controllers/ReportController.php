@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
-
     public function kardex($materialId)
     {
         try {
@@ -23,11 +22,10 @@ class ReportController extends Controller
             $material = Material::findOrFail($materialId);
             $group_material = $material->group()->first()->name_group;
 
-
             $kardex = [];
             $stock = 0;
-            $totalValuation = 0;
             $max_total = 0;
+
             $entries = $material->noteEntries()
                 ->where('management_id', $latestManagement->id)
                 ->where('delivery_date', '<=', $endDate)
@@ -42,13 +40,14 @@ class ReportController extends Controller
                 ->get();
 
             $movements = [];
+
             foreach ($entries as $entry) {
                 $movements[] = [
                     'date' => $entry->pivot->created_at,
                     'type' => 'entry',
                     'description' => $entry->name_supplier . ' - Nota de Entrada #' . $entry->number_note,
                     'quantity' => $entry->pivot->amount_entries,
-                    'cost_unit' => number_format($entry->pivot->cost_unit, 2),
+                    'cost_unit' => $entry->pivot->cost_unit,
                 ];
             }
 
@@ -62,80 +61,70 @@ class ReportController extends Controller
                     'cost_unit' => null,
                 ];
             }
-            usort($movements, function ($a, $b) {
-                return strtotime($a['date']) - strtotime($b['date']);
-            });
+
+            usort($movements, fn($a, $b) => strtotime($a['date']) <=> strtotime($b['date']));
 
             $fifoQueue = [];
 
             foreach ($movements as $movement) {
+                $fecha = date('Y-m-d', strtotime($movement['date']));
+
                 if ($movement['type'] === 'entry') {
                     $fifoQueue[] = [
                         'quantity' => $movement['quantity'],
                         'cost_unit' => $movement['cost_unit'],
                     ];
                     $stock += $movement['quantity'];
-                    $totalValuation = $movement['quantity'] * $movement['cost_unit'];
-                    $max_total = $max_total + $totalValuation;
+                    $importeEntrada = $movement['quantity'] * $movement['cost_unit'];
+                    $max_total += $importeEntrada;
 
                     $kardex[] = [
-                        'date' => date('Y-m-d', strtotime($movement['date'])),
+                        'date' => $fecha,
                         'description' => $movement['description'],
                         'entradas' => $movement['quantity'],
                         'salidas' => 0,
                         'stock_fisico' => $stock,
-                        'cost_unit' => number_format($movement['cost_unit'], 2),
-                        'cost_total' => number_format($max_total, 2),
+                        'cost_unit' => round($movement['cost_unit'], 2),
+                        'importe_entrada' => round($importeEntrada, 2),
+                        'importe_salida' => 0,
+                        'importe_saldo' => round($max_total, 2),
                     ];
-                } elseif ($movement['type'] === 'exit') {
+                } else {
                     $quantityToDeliver = $movement['quantity'];
-                    $costTotal = 0;
+                    $importeSalidaTotal = 0;
 
                     while ($quantityToDeliver > 0 && count($fifoQueue) > 0) {
                         $fifoItem = array_shift($fifoQueue);
 
-                        if ($fifoItem['quantity'] > $quantityToDeliver) {
-                            $costUnit = $fifoItem['cost_unit'];
-                            $costTotal = $quantityToDeliver * $costUnit;
-                            $max_total = $max_total - $costTotal;
+                        $usedQuantity = min($quantityToDeliver, $fifoItem['quantity']);
+                        $costUnit = $fifoItem['cost_unit'];
+                        $importeSalida = $usedQuantity * $costUnit;
+                        $importeSalidaTotal += $importeSalida;
+                        $max_total -= $importeSalida;
 
-                            $kardex[] = [
-                                'date' => date('Y-m-d', strtotime($movement['date'])),
-                                'description' => $movement['description'],
-                                'entradas' => 0,
-                                'salidas' => $quantityToDeliver,
-                                'stock_fisico' => $stock - $quantityToDeliver,
-                                'cost_unit' => number_format($costUnit, 2),
-                                'cost_total' => number_format($max_total, 2),
-                            ];
+                        $stock -= $usedQuantity;
 
-                            $fifoItem['quantity'] -= $quantityToDeliver;
+                        $kardex[] = [
+                            'date' => $fecha,
+                            'description' => $movement['description'],
+                            'entradas' => 0,
+                            'salidas' => $usedQuantity,
+                            'stock_fisico' => $stock,
+                            'cost_unit' => round($costUnit, 2),
+                            'importe_entrada' => 0,
+                            'importe_salida' => round($importeSalida, 2),
+                            'importe_saldo' => round($max_total, 2),
+                        ];
+
+                        $quantityToDeliver -= $usedQuantity;
+                        if ($fifoItem['quantity'] > $usedQuantity) {
+                            $fifoItem['quantity'] -= $usedQuantity;
                             array_unshift($fifoQueue, $fifoItem);
-                            $stock -= $quantityToDeliver;
-                            $totalValuation = max($totalValuation - $costTotal, 0);
-                            $quantityToDeliver = 0;
-                        } else {
-                            $costUnit = $fifoItem['cost_unit'];
-                            $costTotal = $fifoItem['quantity'] * $costUnit;
-                            $max_total = $max_total - $costTotal;
-
-                            $kardex[] = [
-                                'date' => date('Y-m-d', strtotime($movement['date'])),
-                                'description' => $movement['description'],
-                                'entradas' => 0,
-                                'salidas' => $fifoItem['quantity'],
-                                'stock_fisico' => $stock - $fifoItem['quantity'],
-                                'cost_unit' => number_format($costUnit, 2),
-                                'cost_total' => number_format($max_total, 2),
-                            ];
-
-                            $quantityToDeliver -= $fifoItem['quantity'];
-                            $stock -= $fifoItem['quantity'];
-                            $totalValuation = max($totalValuation - $costTotal, 0);
                         }
                     }
                 }
             }
+
             return response()->json([
                 'code_material' => $material->code_material,
                 'description' => $material->description,
@@ -144,13 +133,12 @@ class ReportController extends Controller
                 'kardex_de_existencia' => $kardex
             ]);
         } catch (\Exception $e) {
+            logger($e->getMessage());
             return response()->json(['error' => 'No se pudo generar el Kardex'], 500);
         }
     }
-
     public function print_kardex($materialId)
     {
-
         try {
             $endDate = request()->query('end_date');
             $latestManagement = Management::latest('id')->first();
@@ -159,7 +147,6 @@ class ReportController extends Controller
 
             $kardex = [];
             $stock = 0;
-            $totalValuation = 0;
             $max_total = 0;
 
             $entries = $material->noteEntries()
@@ -183,7 +170,7 @@ class ReportController extends Controller
                     'type' => 'entry',
                     'description' => $entry->name_supplier . ' - Nota de Entrada #' . $entry->number_note,
                     'quantity' => $entry->pivot->amount_entries,
-                    'cost_unit' => number_format($entry->pivot->cost_unit, 2),
+                    'cost_unit' => $entry->pivot->cost_unit,
                 ];
             }
 
@@ -198,77 +185,64 @@ class ReportController extends Controller
                 ];
             }
 
-
-            usort($movements, function ($a, $b) {
-                return strtotime($a['date']) - strtotime($b['date']);
-            });
+            usort($movements, fn($a, $b) => strtotime($a['date']) <=> strtotime($b['date']));
 
             $fifoQueue = [];
 
             foreach ($movements as $movement) {
+                $fecha = date('Y-m-d', strtotime($movement['date']));
+
                 if ($movement['type'] === 'entry') {
                     $fifoQueue[] = [
                         'quantity' => $movement['quantity'],
                         'cost_unit' => $movement['cost_unit'],
                     ];
                     $stock += $movement['quantity'];
-                    $totalValuation = $movement['quantity'] * $movement['cost_unit'];
-                    $max_total = $max_total + $totalValuation;
+                    $importeEntrada = $movement['quantity'] * $movement['cost_unit'];
+                    $max_total += $importeEntrada;
 
                     $kardex[] = [
-                        'date' => date('Y-m-d', strtotime($movement['date'])),
+                        'date' => $fecha,
                         'description' => $movement['description'],
                         'entradas' => $movement['quantity'],
                         'salidas' => 0,
                         'stock_fisico' => $stock,
-                        'cost_unit' => number_format($movement['cost_unit'], 2),
-                        'cost_total' => number_format($max_total, 2),
+                        'cost_unit' => round($movement['cost_unit'], 2),
+                        'importe_entrada' => round($importeEntrada, 2),
+                        'importe_salida' => 0,
+                        'importe_saldo' => round($max_total, 2),
                     ];
-                } elseif ($movement['type'] === 'exit') {
+                } else {
                     $quantityToDeliver = $movement['quantity'];
-                    $costTotal = 0;
+                    $importeSalidaTotal = 0;
 
                     while ($quantityToDeliver > 0 && count($fifoQueue) > 0) {
                         $fifoItem = array_shift($fifoQueue);
 
-                        if ($fifoItem['quantity'] > $quantityToDeliver) {
-                            $costUnit = $fifoItem['cost_unit'];
-                            $costTotal = $quantityToDeliver * $costUnit;
-                            $max_total = $max_total - $costTotal;
+                        $usedQuantity = min($quantityToDeliver, $fifoItem['quantity']);
+                        $costUnit = $fifoItem['cost_unit'];
+                        $importeSalida = $usedQuantity * $costUnit;
+                        $importeSalidaTotal += $importeSalida;
+                        $max_total -= $importeSalida;
 
-                            $kardex[] = [
-                                'date' => date('Y-m-d', strtotime($movement['date'])),
-                                'description' => $movement['description'],
-                                'entradas' => 0,
-                                'salidas' => $quantityToDeliver,
-                                'stock_fisico' => $stock - $quantityToDeliver,
-                                'cost_unit' => number_format($costUnit, 2),
-                                'cost_total' => number_format($max_total, 2),
-                            ];
+                        $stock -= $usedQuantity;
 
-                            $fifoItem['quantity'] -= $quantityToDeliver;
+                        $kardex[] = [
+                            'date' => $fecha,
+                            'description' => $movement['description'],
+                            'entradas' => 0,
+                            'salidas' => $usedQuantity,
+                            'stock_fisico' => $stock,
+                            'cost_unit' => round($costUnit, 2),
+                            'importe_entrada' => 0,
+                            'importe_salida' => round($importeSalida, 2),
+                            'importe_saldo' => round($max_total, 2),
+                        ];
+
+                        $quantityToDeliver -= $usedQuantity;
+                        if ($fifoItem['quantity'] > $usedQuantity) {
+                            $fifoItem['quantity'] -= $usedQuantity;
                             array_unshift($fifoQueue, $fifoItem);
-                            $stock -= $quantityToDeliver;
-                            $totalValuation = max($totalValuation - $costTotal, 0);
-                            $quantityToDeliver = 0;
-                        } else {
-                            $costUnit = $fifoItem['cost_unit'];
-                            $costTotal = $fifoItem['quantity'] * $costUnit;
-                            $max_total = $max_total - $costTotal;
-
-                            $kardex[] = [
-                                'date' => date('Y-m-d', strtotime($movement['date'])),
-                                'description' => $movement['description'],
-                                'entradas' => 0,
-                                'salidas' => $fifoItem['quantity'],
-                                'stock_fisico' => $stock - $fifoItem['quantity'],
-                                'cost_unit' => number_format($costUnit, 2),
-                                'cost_total' => number_format($max_total, 2),
-                            ];
-
-                            $quantityToDeliver -= $fifoItem['quantity'];
-                            $stock -= $fifoItem['quantity'];
-                            $totalValuation = max($totalValuation - $costTotal, 0);
                         }
                     }
                 }
@@ -290,6 +264,7 @@ class ReportController extends Controller
         }
     }
 
+
     public function dashboard_data()
     {
         $period = Management::latest()->first();
@@ -308,138 +283,6 @@ class ReportController extends Controller
         ]);
     }
 
-    // public function kardexGeneral()
-    // {
-    //     try {
-    //         $materials = Material::all();
-    //         $kardexGeneral = [];
-
-    //         foreach ($materials as $material) {
-    //             $stock = 0;
-    //             $totalValuation = 0;
-
-    //             $entries = $material->noteEntries()->orderBy('delivery_date', 'asc')->get();
-    //             $requests = $material->noteRequests()->where('state', '=', 'Aceptado')->orderBy('received_on_date', 'asc')->get();
-
-    //             $movements = [];
-
-    //             foreach ($entries as $entry) {
-    //                 $movements[] = [
-    //                     'date' => $entry->pivot->created_at,
-    //                     'type' => 'entry',
-    //                     'description' => $entry->name_supplier . ' - Nota de Entrada #' . $entry->number_note,
-    //                     'quantity' => $entry->pivot->amount_entries,
-    //                     'cost_unit' => number_format($entry->pivot->cost_unit, 2),
-    //                 ];
-    //             }
-
-    //             foreach ($requests as $request) {
-    //                 $employee = Employee::find($request->user_register);
-    //                 $movements[] = [
-    //                     'date' => $request->pivot->created_at,
-    //                     'type' => 'exit',
-    //                     'description' => ucwords(strtolower("{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}")) . ' - Solicitud #' . $request->id,
-    //                     'quantity' => $request->pivot->delivered_quantity,
-    //                     'cost_unit' => null,
-    //                 ];
-    //             }
-    //             if (count($movements) === 0) {
-    //                 continue;
-    //             }
-    //             usort($movements, function ($a, $b) {
-    //                 return strtotime($b['date']) - strtotime($a['date']);
-    //             });
-
-    //             $fifoQueue = [];
-    //             $kardex = [];
-
-    //             foreach ($movements as $movement) {
-    //                 if ($movement['type'] === 'entry') {
-    //                     $fifoQueue[] = [
-    //                         'quantity' => $movement['quantity'],
-    //                         'cost_unit' => $movement['cost_unit'],
-    //                     ];
-    //                     $stock += $movement['quantity'];
-    //                     $totalValuation += $movement['quantity'] * $movement['cost_unit'];
-
-    //                     $kardex[] = [
-    //                         'date' => date('Y-m-d', strtotime($movement['date'])),
-    //                         'material' => $material->description,
-    //                         'description' => $movement['description'],
-    //                         'entradas' => $movement['quantity'],
-    //                         'salidas' => 0,
-    //                         'stock_fisico' => $stock,
-    //                         'cost_unit' => number_format($movement['cost_unit'], 2),
-    //                         'cost_total' => number_format(max($totalValuation, 0), 2),
-    //                     ];
-    //                 } elseif ($movement['type'] === 'exit') {
-    //                     $quantityToDeliver = $movement['quantity'];
-    //                     $costTotal = 0;
-
-    //                     while ($quantityToDeliver > 0 && count($fifoQueue) > 0) {
-    //                         $fifoItem = array_shift($fifoQueue);
-
-    //                         if ($fifoItem['quantity'] > $quantityToDeliver) {
-    //                             $costUnit = $fifoItem['cost_unit'];
-    //                             $costTotal += $quantityToDeliver * $costUnit;
-
-    //                             $kardex[] = [
-    //                                 'date' => date('Y-m-d', strtotime($movement['date'])),
-    //                                 'material' => $material->description,
-    //                                 'description' => $movement['description'],
-    //                                 'entradas' => 0,
-    //                                 'salidas' => $quantityToDeliver,
-    //                                 'stock_fisico' => $stock - $quantityToDeliver,
-    //                                 'cost_unit' => number_format($costUnit, 2),
-    //                                 'cost_total' => number_format(max($totalValuation - $costTotal, 0), 2),
-    //                             ];
-
-    //                             $fifoItem['quantity'] -= $quantityToDeliver;
-    //                             array_unshift($fifoQueue, $fifoItem);
-    //                             $stock -= $quantityToDeliver;
-    //                             $totalValuation = max($totalValuation - $costTotal, 0);
-    //                             $quantityToDeliver = 0;
-    //                         } else {
-    //                             $costUnit = $fifoItem['cost_unit'];
-    //                             $costTotal += $fifoItem['quantity'] * $costUnit;
-
-    //                             $kardex[] = [
-    //                                 'date' => date('Y-m-d', strtotime($movement['date'])),
-    //                                 'material' => $material->description,
-    //                                 'description' => $movement['description'],
-    //                                 'entradas' => 0,
-    //                                 'salidas' => $fifoItem['quantity'],
-    //                                 'stock_fisico' => $stock - $fifoItem['quantity'],
-    //                                 'cost_unit' => number_format($costUnit, 2),
-    //                                 'cost_total' => number_format(max($totalValuation - $costTotal, 0), 2),
-    //                             ];
-
-    //                             $quantityToDeliver -= $fifoItem['quantity'];
-    //                             $stock -= $fifoItem['quantity'];
-    //                             $totalValuation = max($totalValuation - $costTotal, 0);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //             if (!empty($kardex)) {
-    //                 $kardexGeneral = array_merge($kardexGeneral, $kardex);
-    //             }
-    //         }
-    //         usort($kardexGeneral, function ($a, $b) {
-    //             return strtotime($b['date']) - strtotime($a['date']);
-    //         });
-    //         $kardexGeneral = array_slice($kardexGeneral, 0, 10);
-
-    //         return response()->json($kardexGeneral);
-    //     } catch (\Exception $e) {
-    //         return response()->json([
-    //             'error' => 'No se pudo generar el Kardex general',
-    //             'message' => $e->getMessage(),
-    //             'line' => $e->getLine(),
-    //             'file' => $e->getFile()
-    //         ], 500);
-    //     }
-    // }
 
     public function kardexGeneral()
     {
