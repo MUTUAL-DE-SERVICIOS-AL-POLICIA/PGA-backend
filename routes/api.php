@@ -57,6 +57,8 @@ Route::group([
         Route::get('/listgroup/{id_classifier}', [GroupsController::class, 'list_groups']);
         Route::resource('suppliers', SupplierController::class);
         Route::resource('materials', MaterialController::class);
+        Route::get('fixMaterialDuplicate', [MaterialController::class, 'fixDuplicatedCodes']);
+        Route::get('/materialCorrect', [MaterialController::class, 'NameMaterialCorrect']);
         Route::patch('/updateName/{material}/', [MaterialController::class, 'updateName']);
         Route::resource('types', TypeController::class);
         //Nota de entrada

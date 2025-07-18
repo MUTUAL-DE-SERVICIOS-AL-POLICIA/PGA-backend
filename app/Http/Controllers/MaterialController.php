@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Material;
 use Illuminate\Http\Request;
 use App\Http\Requests\MaterialRequest;
+use App\Models\Entrie_Material;
 use App\Models\Group;
+use App\Models\Note_Entrie;
 
 class MaterialController extends Controller
 {
@@ -54,28 +56,18 @@ class MaterialController extends Controller
                 return response()->json(['error' => 'Group not found'], 404);
             }
 
-            // Obtenemos el último material que no sea de tipo "Caja Chica" y pertenece al grupo
-            $lastMaterial = Material::where('group_id', $data['group_id'])
-                ->where('type', '!=', '%Caja Chica%')
-                ->orderBy('id', 'desc')
-                ->first();
+            // Determinamos un nuevo code_material único
+            $newCorrelativo = 1;
+            do {
+                $newCodeMaterial = $group->code . $newCorrelativo;
+                $exists = Material::where('code_material', $newCodeMaterial)->exists();
+                $newCorrelativo++;
+            } while ($exists);
 
-            // Determinamos el nuevo correlativo
-            if ($lastMaterial) {
-                // Extraemos el número del código de material anterior
-                $lastCorrelativo = (int) str_replace($group->code, '', $lastMaterial->code_material);
-
-                $newCorrelativo = $lastCorrelativo + 1;
-            } else {
-                // Si no hay materiales previos, comenzamos desde 1
-                $newCorrelativo = 1;
-            }
-
-            // Generamos el nuevo código de material
-            $newCodeMaterial = $group->code . $newCorrelativo;
-
+            // Formateamos la descripción en mayúsculas
             $data['description'] = strtoupper($data['description']);
 
+            // Creamos el nuevo material
             $material = Material::create([
                 'group_id' => $data['group_id'],
                 'code_material' => $newCodeMaterial,
@@ -98,6 +90,7 @@ class MaterialController extends Controller
             ], 500);
         }
     }
+
 
 
     /**
@@ -229,6 +222,69 @@ class MaterialController extends Controller
         return response()->json(['status' => true, 'data' => $material], 200);
     }
 
+    public function fixDuplicatedCodes()
+    {
+        try {
 
-    
+            $duplicatedCodes = Material::select('code_material')
+                ->groupBy('code_material')
+                ->havingRaw('COUNT(*) > 1')
+                ->pluck('code_material');
+
+            if ($duplicatedCodes->isEmpty()) {
+                return response()->json(['message' => 'No hay códigos duplicados'], 200);
+            }
+
+            $fixed = [];
+
+            foreach ($duplicatedCodes as $code) {
+
+                $materials = Material::where('code_material', $code)->orderBy('id')->get();
+
+                foreach ($materials as $material) {
+                    $group = $material->group;
+
+                    if (!$group) continue; 
+
+                    $newCorrelativo = 1;
+                    do {
+                        $newCodeMaterial = $group->code . $newCorrelativo;
+                        $exists = Material::where('code_material', $newCodeMaterial)->exists();
+                        $newCorrelativo++;
+                    } while ($exists);
+
+                    $material->code_material = $newCodeMaterial;
+                    $material->save();
+
+                    $fixed[] = [
+                        'material_id' => $material->id,
+                        'old_code' => $code,
+                        'new_code' => $newCodeMaterial
+                    ];
+                }
+            }
+
+            return response()->json([
+                'message' => 'Códigos duplicados corregidos',
+                'fixed' => $fixed
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error al corregir duplicados: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function NameMaterialCorrect(){        
+        $notes = Entrie_Material::where('material_id', 49)->get();
+        
+        foreach ($notes as $note) {
+            if($note->name_material === '34600 - MINERALES (CAJA CHICA)'){
+                $note->name_material = '34700 - MINERALES (CAJA CHICA)';
+                $note->save();
+            }
+        }
+        return $notes;
+    }   
 }
