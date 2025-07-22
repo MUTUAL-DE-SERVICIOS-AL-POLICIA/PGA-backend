@@ -106,8 +106,10 @@ $dns = new DNS2D();
                     <tr>
                         <th class="text-center bg-grey-darker text-white" rowspan="2">FECHA</th>
                         <th class="text-center bg-grey-darker text-white border-left-white" rowspan="2">DETALLE</th>
+                        <th class="text-center bg-grey-darker text-white border-left-white" rowspan="2">SALDO INICIAL</th>
                         <th class="text-center bg-grey-darker text-white border-left-white" colspan="3">CANTIDAD</th>
                         <th class="text-center bg-grey-darker text-white border-left-white" rowspan="2">PRECIO UNITARIO</th>
+                        <th class="text-center bg-grey-darker text-white border-left-white" rowspan="2">SALDO INICIAL</th>
                         <th class="text-center bg-grey-darker text-white border-left-white" colspan="3">IMPORTES</th>
                     </tr>
                     <tr>
@@ -120,14 +122,35 @@ $dns = new DNS2D();
                     </tr>
                 </thead>
                 <tbody class="table-striped">
+                    @if ($start_date == null)
+                    <tr>
+                        <td class="text-center">2025-01-01</td>
+                        <td class="text-center">SALDO DEL 31/01/2024</td>
+                        <td class="text-center">
+                            {{ !empty($kardex_de_existencia[0]['entradas']) ? $kardex_de_existencia[0]['entradas'] : 0 }}
+                        </td>
+                        <td class="text-left"></td>
+                        <td class="text-left"></td>
+                        <td class="text-left"></td>
+                        <td class="text-left"></td>
+                        <td class="text-center">
+                            {{ !empty($kardex_de_existencia[0]['importe_entrada']) ? number_format($kardex_de_existencia[0]['importe_entrada'], 2) : 0 }}
+                        </td>
+                        <td class="text-left"></td>
+                        <td class="text-left"></td>
+                        <td class="text-left"></td>
+                    </tr>
+                    @endif
                     @foreach ($kardex_de_existencia as $index => $kardex)
                     <tr>
                         <td class="text-center">{{$kardex['date']}}</td>
                         <td class="text-left">{{$kardex['description']}}</td>
+                        <td class="text-left"></td>
                         <td class="text-center">{{$kardex['entradas']}}</td>
                         <td class="text-center">{{$kardex['salidas']}}</td>
                         <td class="text-center">{{$kardex['stock_fisico']}}</td>
                         <td class="text-right">{{ number_format($kardex['cost_unit'], 2) }}</td>
+                        <td class="text-left"></td>
                         <td class="text-right">
                             {{ $kardex['importe_entrada'] ? number_format($kardex['importe_entrada'], 2) : '---' }}
                         </td>
@@ -143,10 +166,16 @@ $dns = new DNS2D();
                     <tr style="background-color: #d1f2eb; font-weight: bold;">
                         <td></td>
                         <td class="text-left">TOTAL</td>
+                        <td class="text-center">
+                            {{ !empty($kardex_de_existencia[0]['entradas']) ? $kardex_de_existencia[0]['entradas'] : 0 }}
+                        </td>
                         <td class="text-center">{{ $totales['entradas'] }}</td>
                         <td class="text-center">{{ $totales['salidas'] }}</td>
                         <td class="text-center">{{ $totales['stock_fisico'] }}</td>
                         <td class="text-right">---</td>
+                        <td class="text-center">
+                            {{ !empty($kardex_de_existencia[0]['importe_entrada']) ? number_format($kardex_de_existencia[0]['importe_entrada'], 2) : 0 }}
+                        </td>
                         <td class="text-right">{{ number_format($totales['importe_entrada'], 2) }}</td>
                         <td class="text-right">{{ number_format($totales['importe_salida'], 2) }}</td>
                         <td class="text-right">{{ number_format($totales['importe_saldo'], 2) }}</td>

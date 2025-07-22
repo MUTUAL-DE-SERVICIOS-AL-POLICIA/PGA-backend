@@ -88,11 +88,14 @@ $dns = new DNS2D();
                     <tr>
                         <th class="text-center bg-grey-darker text-white" rowspan="2">CÓDIGO</th>
                         <th class="text-center bg-grey-darker text-white border-left-white" rowspan="2">DETALLE</th>
-                        <th class="text-center bg-grey-darker text-white border-left-white" colspan="2">SAL. GES. ANT.</th>
-                        <th class="text-center bg-grey-darker text-white border-left-white" colspan="2">COM. GES. ACT.</th>
-                        <th class="text-center bg-grey-darker text-white border-left-white" colspan="2">SAL. GES. ACT.</th>
+                        <th class="text-center bg-grey-darker text-white border-left-white" colspan="2">SALDO INICIAL</th>
+                        <th class="text-center bg-grey-darker text-white border-left-white" colspan="2">ENTRADAS</th>
+                        <th class="text-center bg-grey-darker text-white border-left-white" colspan="2">SALIDAS</th>
+                        <th class="text-center bg-grey-darker text-white border-left-white" colspan="2">SALDOS</th>
                     </tr>
                     <tr>
+                        <th class="text-center bg-grey-darker text-white border-left-white">FISICO</th>
+                        <th class="text-center bg-grey-darker text-white border-left-white">VALOR BS.</th>
                         <th class="text-center bg-grey-darker text-white border-left-white">FISICO</th>
                         <th class="text-center bg-grey-darker text-white border-left-white">VALOR BS.</th>
                         <th class="text-center bg-grey-darker text-white border-left-white">FISICO</th>
@@ -104,14 +107,16 @@ $dns = new DNS2D();
                 <tbody class="table-striped">
                     @foreach ($results as $group)
                     <tr>
-                        <td class="text-left">{{ $group['codigo_grupo'] }}</td>
                         <td class="text-left">{{ $group['grupo'] }}</td>
-                        <td class="text-left">{{ $group['total_cantidad_anterior'] }}</td>
-                        <td class="text-left">{{ $group['total_presupuesto_anterior'] }}</td>
-                        <td class="text-left">{{ $group['total_cantidad'] }}</td>
-                        <td class="text-left">{{ $group['total_presupuesto'] }}</td>
-                        <td class="text-left">{{ $group['cantidad_entregada'] }}</td>
-                        <td class="text-left">{{ $group['suma_cost_detail'] }}</td>
+                        <td class="text-left">{{ $group['codigo_grupo'] }}</td>
+                        <td class="text-center">{{ $group['resumen']['saldo_anterior_cantidad'] }}</td>
+                        <td class="text-right">{{ number_format($group['resumen']['saldo_anterior_total'],2) }}</td>
+                        <td class="text-center">{{ ($group['resumen']['entradas_cantidad'] - $group['resumen']['saldo_anterior_cantidad']) }}</td>
+                        <td class="text-right">{{ number_format(($group['resumen']['entradas_total'] - $group['resumen']['saldo_anterior_total']), 2) }}</td>
+                        <td class="text-center">{{ $group['resumen']['salidas_cantidad'] }}</td>
+                        <td class="text-right">{{ number_format($group['resumen']['salidas_total'],2) }}</td>
+                        <td class="text-center">{{ $group['resumen']['saldo_final_cantidad'] }}</td>
+                        <td class="text-right">{{ number_format($group['resumen']['saldo_final_total'],2) }}</td>
                     </tr>
                     @endforeach
                 </tbody>

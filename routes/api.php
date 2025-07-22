@@ -84,12 +84,15 @@ Route::group([
 
 
         Route::get('/ReportPrintValuedPhysicalConsolidated/{management}', [ReportController::class, 'consolidated_inventory']);
+        Route::get('/ReportConsolidatedExcel', [ReportController::class, 'consolidated_inventory_excel']);
 
+
+        Route::get('/ValuedPhysicalConsolidatedModificaded', [ReportController::class, 'consolidated_inventory_modificaded']);
 
         Route::get('/PrintValuedPhysical', [ReportController::class, 'PrintValuedPhysical']);
         Route::get('/PrintValuedPhysicalExcel', [ReportController::class, 'exportValuedInventoryExcel']);
 
-        Route::get('/PrintValuedPhysicalConsolidated/{management}', [ReportController::class, 'print_consolidated_valued_physical_inventory']);
+        Route::get('/PrintValuedPhysicalConsolidated', [ReportController::class, 'print_consolidated_valued_physical_inventory']);
         Route::get('/ManagementClosure', [ReportController::class, 'management_closure']);
 
 
