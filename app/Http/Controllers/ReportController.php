@@ -36,7 +36,7 @@ class ReportController extends Controller
             $entries = $material->noteEntries()
                 ->where('management_id', $latestManagement->id)
                 ->where('delivery_date', '<=', $endDate)
-                ->orderBy('delivery_date', 'asc')
+                ->orderBy('number_note', 'asc')
                 ->get();
 
             $requests = $material->noteRequests()
@@ -178,7 +178,7 @@ class ReportController extends Controller
             $entries = $material->noteEntries()
                 ->where('management_id', $latestManagement->id)
                 ->where('delivery_date', '<=', $endDate)
-                ->orderBy('delivery_date', 'asc')
+                ->orderBy('number_note', 'asc')
                 ->get();
 
             $requests = $material->noteRequests()
@@ -315,7 +315,7 @@ class ReportController extends Controller
             $entries = $material->noteEntries()
                 ->where('management_id', $latestManagement->id)
                 ->where('delivery_date', '<=', $endDate)
-                ->orderBy('delivery_date', 'asc')
+                ->orderBy('number_note', 'asc')
                 ->get();
 
             $requests = $material->noteRequests()
