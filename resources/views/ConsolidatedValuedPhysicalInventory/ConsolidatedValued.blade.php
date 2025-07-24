@@ -82,6 +82,18 @@ $dns = new DNS2D();
         <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
         <div class="block">
             <div class="leading-tight text-sm text-center m-b-10">{{ $title }}</div>
+            <div class="leading-tight text-xxxl text-center m-b-10">(EXPRESADO EN BOLIVIANOS)</div>
+            @if ($start_date && $end_date)
+            <div class="leading-tight text-xs text-center m-b-10">
+                <strong>DESDE:</strong> {{ \Carbon\Carbon::parse($start_date)->format('d/m/Y') }}
+                &nbsp;&nbsp;&nbsp;
+                <strong>HASTA:</strong> {{ \Carbon\Carbon::parse($end_date)->format('d/m/Y') }}
+            </div>
+            @elseif ($end_date)
+            <div class="leading-tight text-xs text-center m-b-10">
+                <strong>HASTA:</strong> {{ \Carbon\Carbon::parse($end_date)->format('d/m/Y') }}
+            </div>
+            @endif
 
             <table class="table-info w-100 m-b-10 uppercase text-xs">
                 <thead>

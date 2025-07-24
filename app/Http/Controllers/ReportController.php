@@ -22,6 +22,26 @@ class ReportController extends Controller
     public function kardex($materialId)
     {
         try {
+            $latestManagement = Management::latest('id')->first();
+
+            if ($latestManagement) {
+                $material_balance = Material::findOrFail($materialId);
+                $balance = $material_balance->noteEntries()
+                    ->where('management_id', $latestManagement->id)
+                    ->where('observation', 'Saldo trasladado')
+                    ->orderBy('number_note', 'asc')
+                    ->get();
+
+                $amountEntriesTotal = 0;
+                $costTotalTotal = 0;
+
+                if ($balance) {
+                    foreach ($balance as $entry) {
+                        $amountEntriesTotal += $entry->pivot->amount_entries;
+                        $costTotalTotal += $entry->pivot->cost_total;
+                    }
+                }
+            }
             $startDate = request()->query('start_date');
             $endDate = Carbon::parse(request()->query('end_date'))->addDay()->toDateString();
             $latestManagement = Management::latest('id')->first();
@@ -147,13 +167,16 @@ class ReportController extends Controller
                 'importe_salida' => round($totalImporteSalida, 2),
                 'importe_saldo' => round($totalImporteSaldo, 2),
             ];
+
             return response()->json([
                 'code_material' => $material->code_material,
                 'description' => $material->description,
                 'unit_material' => $material->unit_material,
                 'group' => strtoupper($group_material),
                 'kardex_de_existencia' => $kardex,
-                'totales' => $totales
+                'totales' => $totales,
+                'balance_amount_entries' => $amountEntriesTotal,
+                'balance_cost_total' => $costTotalTotal
             ]);
         } catch (\Exception $e) {
             logger($e->getMessage());
@@ -164,6 +187,28 @@ class ReportController extends Controller
     public function print_kardex_excel($materialId)
     {
         try {
+            $latestManagement = Management::latest('id')->first();
+
+            if ($latestManagement) {
+                $material_balance = Material::findOrFail($materialId);
+                $balance = $material_balance->noteEntries()
+                    ->where('management_id', $latestManagement->id)
+                    ->where('observation', 'Saldo trasladado')
+                    ->orderBy('number_note', 'asc')
+                    ->get();
+
+                $amountEntriesTotal = 0;
+                $costTotalTotal = 0;
+
+                if ($balance) {
+                    foreach ($balance as $entry) {
+                        $amountEntriesTotal += $entry->pivot->amount_entries;
+                        $costTotalTotal += $entry->pivot->cost_total;
+                    }
+                }
+            }
+
+
             $startDate = request()->query('start_date');
             $endDate = Carbon::parse(request()->query('end_date'))->addDay()->toDateString();
             $latestManagement = Management::latest('id')->first();
@@ -300,6 +345,27 @@ class ReportController extends Controller
     public function print_kardex($materialId)
     {
         try {
+
+            $latestManagement = Management::latest('id')->first();
+
+            if ($latestManagement) {
+                $material_balance = Material::findOrFail($materialId);
+                $balance = $material_balance->noteEntries()
+                    ->where('management_id', $latestManagement->id)
+                    ->where('observation', 'Saldo trasladado')
+                    ->orderBy('number_note', 'asc')
+                    ->get();
+
+                $amountEntriesTotal = 0;
+                $costTotalTotal = 0;
+
+                if ($balance) {
+                    foreach ($balance as $entry) {
+                        $amountEntriesTotal += $entry->pivot->amount_entries;
+                        $costTotalTotal += $entry->pivot->cost_total;
+                    }
+                }
+            }
             $startDate = request()->query('start_date');
             $endDate = Carbon::parse(request()->query('end_date'))->addDay()->toDateString();
             $dateof = request()->query('end_date');
@@ -437,6 +503,8 @@ class ReportController extends Controller
                 'totales' => $totales,
                 'start_date' => $startDate,
                 'end_date' => $dateof,
+                'balance_amount_entries' => $amountEntriesTotal,
+                'balance_cost_total' => $costTotalTotal
             ];
 
             $pdf = Pdf::loadView('Report_Kardex.ReportKardex', $data)->setPaper('letter', 'landscape');
@@ -705,8 +773,6 @@ class ReportController extends Controller
                 }
             }
         });
-
-        // Obtener saldos anteriores
         $previousManagement = Management::where('id', '<', $latestManagement->id)
             ->orderByDesc('id')
             ->first();
@@ -761,8 +827,6 @@ class ReportController extends Controller
                 }
             });
         }
-
-        // Reindexar saldos anteriores
         $saldosIndexados = [];
         foreach ($saldosAnteriores as $grupo) {
             foreach ($grupo['materiales'] as $material) {
@@ -785,8 +849,12 @@ class ReportController extends Controller
                 'codigo_grupo' => $groupData['codigo_grupo'],
                 'materiales' => []
             ];
+            $materialesOrdenados = $groupData['materiales'];
+            uksort($materialesOrdenados, function ($a, $b) {
+                return strcmp($a, $b);
+            });
 
-            foreach ($groupData['materiales'] as $materialCode => $materialData) {
+            foreach ($materialesOrdenados as $materialCode => $materialData) {
                 $materialLotes = array_map(function ($lote) {
                     return [
                         'fecha_ingreso' => $lote['fecha_ingreso'],
@@ -808,7 +876,6 @@ class ReportController extends Controller
                 ];
             }
 
-            // Calcular totales del grupo
             $saldoAnteriorCantidad = 0;
             $saldoAnteriorTotal = 0;
             $entradasCantidad = 0;
@@ -1357,7 +1424,9 @@ class ReportController extends Controller
 
         $data = [
             'title' => 'INVENTARIO FISICO VALORADO CONSOLIDADO',
-            'results' => $result
+            'results' => $result,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
         ];
 
 
@@ -1466,7 +1535,6 @@ class ReportController extends Controller
         $management = Management::all();
         return ($management);
     }
-
 
     public function consolidated_inventory($request)
     {

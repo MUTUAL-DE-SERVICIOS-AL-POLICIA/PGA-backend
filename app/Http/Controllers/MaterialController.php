@@ -38,6 +38,7 @@ class MaterialController extends Controller
     public function store(Request $request)
     {
         try {
+            logger($request);
             $data = $request->validate([
                 'group_id' => 'required|exists:groups,id',
                 'description' => 'required|string',
@@ -49,14 +50,12 @@ class MaterialController extends Controller
                 'type' => 'required|string',
             ]);
 
-            // Buscamos el grupo especificado
             $group = Group::find($data['group_id']);
 
             if (!$group) {
                 return response()->json(['error' => 'Group not found'], 404);
             }
 
-            // Determinamos un nuevo code_material único
             $newCorrelativo = 1;
             do {
                 $newCodeMaterial = $group->code . $newCorrelativo;
@@ -64,10 +63,8 @@ class MaterialController extends Controller
                 $newCorrelativo++;
             } while ($exists);
 
-            // Formateamos la descripción en mayúsculas
             $data['description'] = strtoupper($data['description']);
 
-            // Creamos el nuevo material
             $material = Material::create([
                 'group_id' => $data['group_id'],
                 'code_material' => $newCodeMaterial,
@@ -90,8 +87,6 @@ class MaterialController extends Controller
             ], 500);
         }
     }
-
-
 
     /**
      * Display the specified resource.
@@ -116,7 +111,6 @@ class MaterialController extends Controller
                 'cost_total' => $entry->pivot->cost_total,
             ];
         });
-
 
         return response()->json([
             'material_id' => $material->id,
@@ -244,7 +238,7 @@ class MaterialController extends Controller
                 foreach ($materials as $material) {
                     $group = $material->group;
 
-                    if (!$group) continue; 
+                    if (!$group) continue;
 
                     $newCorrelativo = 1;
                     do {
@@ -276,15 +270,76 @@ class MaterialController extends Controller
         }
     }
 
-    public function NameMaterialCorrect(){        
+    public function NameMaterialCorrect()
+    {
         $notes = Entrie_Material::where('material_id', 49)->get();
-        
+
         foreach ($notes as $note) {
-            if($note->name_material === '34600 - MINERALES (CAJA CHICA)'){
+            if ($note->name_material === '34600 - MINERALES (CAJA CHICA)') {
                 $note->name_material = '34700 - MINERALES (CAJA CHICA)';
                 $note->save();
             }
         }
         return $notes;
-    }   
+    }
+
+    public function create_material_sub_group()
+    {
+        $names_combustibles = [
+            '34110 - COMBUSTIBLES, LUBRICANTES Y DERIVADOS PARA CONSUMO (CAJA CHICA)',
+            '34120 - COMBUSTIBLES, LUBRICANTES Y DERIVADOS PARA COMERCIALIZACIÓN',
+            '34130 - ENERGIA ELÉCTRICA PARA COMERCIALIZACIÓN'
+        ];
+
+        $names_sumunistros = [
+            '39910 - ACUÑACION DE MONEDAS E IMPRESION DE BILLETES',
+            '39911 - ACUÑACION DE MONEDAS',
+            '39912 - IMPRESION DE BILLETES',
+            '39990 - OTROS MATERIALES Y SUMINISTROS'
+        ];
+
+        $this->create_materials_for_group($names_combustibles, 13);
+
+        $this->create_materials_for_group($names_sumunistros, 30);
+
+        return response()->json([
+            'message' => 'Materiales creados correctamente para ambos grupos.',
+        ], 201);
+    }
+
+    private function create_materials_for_group($names, $group_id)
+    {
+
+        $type = 'Caja Chica, Fondo de Avance, Reposiciones'; 
+        $state = 'Inhabilitado';
+        $unit_material = 'GLOBAL';
+        $stock = 0;
+        $min = 5;
+        $barcode = '1045'; 
+        $correlativo = 1;  
+
+        foreach ($names as $name) {
+
+            preg_match('/(\d{5})/', $name, $matches);
+            
+            $baseCode = $matches[1];
+
+            $newCodeMaterial = $baseCode + $correlativo;
+
+            $materialData = [
+                'group_id' => $group_id,
+                'description' => $name,
+                'unit_material' => $unit_material,
+                'barcode' => $barcode,
+                'stock' => $stock,
+                'state' => $state,
+                'min' => $min,
+                'type' => $type,
+                'code_material' => $newCodeMaterial,
+            ];
+
+            Material::create($materialData);
+            $correlativo++;
+        }
+    }
 }

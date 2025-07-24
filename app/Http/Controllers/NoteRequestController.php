@@ -105,7 +105,6 @@ class NoteRequestController extends Controller
         ], 200);
     }
 
-
     public function listUserNoteRequests($userId)
     {
         $noteRequests = NoteRequest::where('user_register', $userId)->with('materials')->orderBy('id', 'desc')->get();
@@ -294,7 +293,6 @@ class NoteRequestController extends Controller
         return $pdf->download('formulario_solicitud_de_material_de_almacén.pdf');
     }
 
-
     public function get_cost_unit_of_material_with_balance(Material $material)
     {
         $latestManagement = Management::latest('id')->first();
@@ -314,7 +312,6 @@ class NoteRequestController extends Controller
         }
         return null;
     }
-
 
     public function print_post_request(NoteRequest $note_request)
     {

@@ -67,14 +67,11 @@ class NoteEntriesController extends Controller
         return response()->json([
             'status' => 'success',
             'total' => $notes->total(),
-            'page' => $notes->currentPage() - 1, 
+            'page' => $notes->currentPage() - 1,
             'last_page' => $notes->lastPage(),
             'data' => $notes->items(),
         ], 200);
     }
-
-
-
 
     public function list_note_entries_revision(Request $request)
     {
@@ -180,11 +177,11 @@ class NoteEntriesController extends Controller
                 ]);
             }
             if ($noteEntrie->type_id == 2) {
-                $number_note = 0;
+                $number_note_request = 0;
                 $noteRequest = NoteRequest::create([
-                    'number_note' => $number_note,
+                    'number_note' => $number_note_request,
                     'state' => 'En Revision',
-                    'observation' => 'Ninguno',
+                    'observation' => $number_note,
                     'user_register' => $validateData['id_user'],
                     'type_id' => 2,
                     'request_date' => today()->toDateString(),
@@ -244,12 +241,10 @@ class NoteEntriesController extends Controller
         DB::beginTransaction();
 
         try {
-            // Marcar como eliminado
             $note_entry->state = "Eliminado";
             $note_entry->observation = "Eliminado";
             $note_entry->save();
 
-            // Eliminar relaciones con materiales (pivot entries_material)
             foreach ($note_entry->materials as $material) {
                 $entryMaterial = Entrie_Material::where('note_id', $note_entry->id)
                     ->where('material_id', $material->id)
@@ -260,12 +255,17 @@ class NoteEntriesController extends Controller
                 }
             }
 
-            // Eliminar relaciones con proveedores (pivot note_entrie_supplier)
-            // Eliminacion logica
             $note_entry->suppliers()->detach();
 
-            // Eliminar la nota (soft delete)
             $note_entry->delete();
+
+            if ($note_entry->type_id == 2) {
+                $note = NoteRequest::where('observation', $note_entry->number_note)->first();
+                if ($note) {
+                    $note->state = 'Cancelado';
+                    $note->save();
+                }
+            }
 
             DB::commit();
             return response()->json(['message' => 'Eliminado correctamente'], 200);
@@ -274,7 +274,6 @@ class NoteEntriesController extends Controller
             return response()->json(['error' => 'Error al eliminar la nota: ' . $e->getMessage()], 500);
         }
     }
-
 
     public function print_note_entry(Note_Entrie $note_entry)
     {
@@ -337,7 +336,6 @@ class NoteEntriesController extends Controller
         return $lastNote ? $lastNote->number_note + 1 : 1;
     }
 
-
     public function create_note_request(Request $request)
     {
         $number_note = 0;
@@ -373,5 +371,17 @@ class NoteEntriesController extends Controller
         $note2->costDetails = $tempCost;
         $note1->save();
         $note2->save();
+    }
+
+    public function note_request_modificaciones()
+    {
+        $notes = NoteRequest::where('number_note', 0)->where('state', 'En Revision')->where('type_id', 2)->get();
+        if ($notes) {
+            foreach ($notes as $note) {
+                $note->state = 'Cancelado';
+                $note->save();
+            }
+        }
+        return $notes;
     }
 }

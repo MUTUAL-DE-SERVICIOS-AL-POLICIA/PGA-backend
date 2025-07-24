@@ -12,6 +12,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\TypeController;
 use App\Http\Controllers\UserLdapController;
+use App\Models\NoteRequest;
 use Illuminate\Support\Facades\Route;
 use Laravel\Prompts\Note;
 
@@ -59,6 +60,9 @@ Route::group([
         Route::get('/listgroup/{id_classifier}', [GroupsController::class, 'list_groups']);
         Route::resource('suppliers', SupplierController::class);
         Route::resource('materials', MaterialController::class);
+
+        Route::get('materials_add', [MaterialController::class, 'create_material_sub_group']);
+
         Route::get('fixMaterialDuplicate', [MaterialController::class, 'fixDuplicatedCodes']);
         Route::patch('/updateName/{material}/', [MaterialController::class, 'updateName']);
         Route::resource('types', TypeController::class);
@@ -73,6 +77,7 @@ Route::group([
         //Notas de Solicitud
         Route::post('/delivered_material', [NoteRequestController::class, 'delivered_of_material']);
         Route::get('/print_post_request/{note_request}', [NoteRequestController::class, 'print_post_request']);
+        Route::get('mod_notes_request', [NoteEntriesController::class, 'note_request_modificaciones']);
         //Dashboard
         Route::get('/dataDashboard', [ReportController::class, 'dashboard_data']);
         Route::get('/dataTableDashboard', [ReportController::class, 'kardexGeneral']);
