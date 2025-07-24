@@ -38,7 +38,6 @@ class MaterialController extends Controller
     public function store(Request $request)
     {
         try {
-            logger($request);
             $data = $request->validate([
                 'group_id' => 'required|exists:groups,id',
                 'description' => 'required|string',
