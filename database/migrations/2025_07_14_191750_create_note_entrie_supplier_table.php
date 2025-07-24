@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('note_entrie_id');
             $table->unsignedBigInteger('supplier_id');
-            $table->string('invoce_number');
+            $table->string('invoice_number');
 
             $table->foreign('note_entrie_id')->references('id')->on('note_entries')->onDelete('cascade');
             $table->foreign('supplier_id')->references('id')->on('suppliers')->onDelete('cascade');
