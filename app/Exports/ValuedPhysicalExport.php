@@ -83,7 +83,7 @@ class ValuedPhysicalExport implements FromArray, WithStyles
             $rows[] = [
                 'TOTAL BS', '', '',
                 $resumen['saldo_anterior_cantidad'], '', number_format($resumen['saldo_anterior_total'], 2),
-                $resumen['entradas_cantidad'], '', number_format($resumen['entradas_total'], 2),
+                $resumen['entradas_cantidad'], '', number_format($resumen['entradas_total'] - $resumen['saldo_anterior_total'], 2),
                 $resumen['salidas_cantidad'], '', number_format($resumen['salidas_total'], 2),
                 $resumen['saldo_final_cantidad'], '', number_format($resumen['saldo_final_total'], 2)
             ];
