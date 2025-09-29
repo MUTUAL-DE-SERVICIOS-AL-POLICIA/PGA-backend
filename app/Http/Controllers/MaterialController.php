@@ -282,30 +282,6 @@ class MaterialController extends Controller
         return $notes;
     }
 
-    public function create_material_sub_group()
-    {
-        $names_combustibles = [
-            '34110 - COMBUSTIBLES, LUBRICANTES Y DERIVADOS PARA CONSUMO (CAJA CHICA)',
-            '34120 - COMBUSTIBLES, LUBRICANTES Y DERIVADOS PARA COMERCIALIZACIÓN',
-            '34130 - ENERGIA ELÉCTRICA PARA COMERCIALIZACIÓN'
-        ];
-
-        $names_sumunistros = [
-            '39910 - ACUÑACION DE MONEDAS E IMPRESION DE BILLETES',
-            '39911 - ACUÑACION DE MONEDAS',
-            '39912 - IMPRESION DE BILLETES',
-            '39990 - OTROS MATERIALES Y SUMINISTROS'
-        ];
-
-        $this->create_materials_for_group($names_combustibles, 13);
-
-        $this->create_materials_for_group($names_sumunistros, 30);
-
-        return response()->json([
-            'message' => 'Materiales creados correctamente para ambos grupos.',
-        ], 201);
-    }
-
     private function create_materials_for_group($names, $group_id)
     {
 
