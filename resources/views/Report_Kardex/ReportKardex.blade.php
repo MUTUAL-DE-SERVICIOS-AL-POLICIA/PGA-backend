@@ -125,7 +125,7 @@ $dns = new DNS2D();
 
                     <tr>
                         <td class="text-center">{{$firtsDay}}</td>
-                        <td class="text-center">SALDO DEL 31/01/2024</td>
+                        <td class="text-center">SALDO DEL {{$lastDay}}</td>
                         <td class="text-center">
                             {{$balance_amount_entries}}
                         </td>

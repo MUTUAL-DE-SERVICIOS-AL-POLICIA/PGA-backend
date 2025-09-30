@@ -281,40 +281,4 @@ class MaterialController extends Controller
         }
         return $notes;
     }
-
-    private function create_materials_for_group($names, $group_id)
-    {
-
-        $type = 'Caja Chica, Fondo de Avance, Reposiciones'; 
-        $state = 'Inhabilitado';
-        $unit_material = 'GLOBAL';
-        $stock = 0;
-        $min = 5;
-        $barcode = '1045'; 
-        $correlativo = 1;  
-
-        foreach ($names as $name) {
-
-            preg_match('/(\d{5})/', $name, $matches);
-            
-            $baseCode = $matches[1];
-
-            $newCodeMaterial = $baseCode + $correlativo;
-
-            $materialData = [
-                'group_id' => $group_id,
-                'description' => $name,
-                'unit_material' => $unit_material,
-                'barcode' => $barcode,
-                'stock' => $stock,
-                'state' => $state,
-                'min' => $min,
-                'type' => $type,
-                'code_material' => $newCodeMaterial,
-            ];
-
-            Material::create($materialData);
-            $correlativo++;
-        }
-    }
 }
