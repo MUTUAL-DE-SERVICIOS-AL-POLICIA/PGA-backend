@@ -35,6 +35,7 @@ Route::group([
     Route::get('/printPettCashDischarge/{notepettyCash}', [ProductController::class, 'print_Petty_Cash_discharge']);
     Route::get('/list_group', [ProductController::class, 'list_group']);
     Route::post('/savePettyCashDetails', [ProductController::class, 'save_petty_cash']);
+    Route::post('/change_petty_cash_to_replenishment_of_funds', [ProductController::class, 'change_petty_cash_to_replenishment_of_funds']);
     Route::post('/personal_transpor_tickets', [ProductController::class, 'create_note_tickets']);
     Route::get('/controlNote', [NoteEntriesController::class, 'controlNote']);
 
@@ -111,7 +112,6 @@ Route::group([
         Route::get('/listRequestDirections/{direction}', [UserLdapController::class, 'list_users_direction']);
         Route::get('/printListRequestDirections/{direction}', [UserLdapController::class, 'list_direction_print']);
 
-
         Route::get('/printAccountabilitySheet', [PettycashController::class, 'Accountability_sheet']);
         Route::get('/AccountabilitySheet', [PettycashController::class, 'Print_Accountability_sheet']);
         Route::get('/RecordBook', [PettycashController::class, 'Petty_Cash_Record_Book']);
@@ -121,5 +121,18 @@ Route::group([
         Route::get('/createDischarge', [PettycashController::class, 'CreateDischarge']);
 
         Route::get('/listManagement', [ReportController::class, 'list_mangement']);
+        Route::get('/getPettyCash', [PettycashController::class, 'list_manglist_total_petty_cashement']);
+        Route::get('/listPettyNoteCash', [PettycashController::class, 'listNotePettyCashes']);
+        Route::post('/sendGroup', [PettycashController::class, 'deliveredGroupProduct']);
+        Route::post('/send_changes_funds', [PettycashController::class, 'changes_funds']);
+
+        Route::get('/php-config', function () {
+            return response()->json([
+                'memory_limit' => ini_get('memory_limit'),
+                'max_execution_time' => ini_get('max_execution_time'),
+                'upload_max_filesize' => ini_get('upload_max_filesize'),
+                'post_max_size' => ini_get('post_max_size'),
+            ]);
+        });
     });
 });

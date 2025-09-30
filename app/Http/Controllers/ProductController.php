@@ -9,21 +9,51 @@ use App\Models\Group;
 use App\Models\Management;
 use App\Models\Material;
 use App\Models\PettyCash;
+use App\Models\PettyCash_Product;
 use App\Models\Product;
+use App\Models\TypePetty;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use NumberFormatter;
 
 class ProductController extends Controller
 {
 
     public function list_petty_cash_user($userId)
     {
-        $notePettyCash = PettyCash::where('user_register', $userId)->with('products')->orderBy('id', 'desc')->get();
-        return $notePettyCash;
+        $notes = PettyCash::where('user_register', $userId)
+            ->with(['products' => function ($q) {
+                $q->select('products.id', 'description');
+            }])
+            ->orderByDesc('id')
+            ->get(['id', 'number_note', 'concept', 'request_date', 'delivery_date', 'approximate_cost', 'state', 'comment_recived']);
+
+        $data = $notes->map(function ($n) {
+            return [
+                'id' => $n->id,
+                'number_note' => $n->number_note,
+                'concept' => $n->concept,
+                'request_date' => (string) $n->request_date,
+                'delivery_date' => (string) $n->delivery_date,
+                'approximate_cost' => $n->approximate_cost,
+                'state' => $n->state,
+                'comment_recived' => $n->comment_recived,
+                'products' => $n->products->map(function ($p) {
+                    return [
+                        'description' => $p->description,
+                        'costDetail' => optional($p->pivot)->costDetails,
+                        'amount_request' => optional($p->pivot)->amount_request,
+                    ];
+                })->values(),
+            ];
+        })->values();
+
+        return response()->json($data);
     }
+
 
     public function list_petty_cash()
     {
@@ -31,19 +61,25 @@ class ProductController extends Controller
         return $query;
     }
 
+    public function list_total_petty_cash()
+    {
+        $fund = Fund::latest()->first();
+        $query = PettyCash::where('fund_id', $fund->id)->get();
+        return response()->json([
+            'data' => $query
+        ]);
+    }
+
     public function create_product(Request $request)
     {
         try {
             $validate = $request->validate([
                 'description' => 'required|string|max:255',
-                'object' => 'required|string|max:255',
             ]);
             $validate['description'] = strtoupper($validate['description']);
-            $validate['object'] = strtoupper($validate['object']);
-
             $product = Product::create([
                 'description' => $validate['description'],
-                'cost_object' => $validate['object'],
+                'cost_object' => 'CAJA CHICA',
             ]);
             return response()->json([
                 'message' => 'Producto creado correctamente',
@@ -79,6 +115,7 @@ class ProductController extends Controller
             'user_register' => $request['id'],
             'management_id' => $period->id,
             'fund_id' => $fund->id,
+            'type_cash_id' => $request->type
 
         ]);
 
@@ -166,6 +203,9 @@ class ProductController extends Controller
     {
         $positionName = $this->titlePerson($notepettyCash->user_register);
         $user = User::where('employee_id', $notepettyCash->user_register)->first();
+
+        $type = TypePetty::whereId($notepettyCash->type_cash_id)->first();
+
         if ($user) {
             $employee = Employee::find($notepettyCash->user_register);
             $products = $notepettyCash->products()->get()->map(function ($product) {
@@ -180,7 +220,9 @@ class ProductController extends Controller
             }, 0);
 
             $data = [
-                'title' => 'VALE DE CAJA CHICA',
+                'title' => 'VALE DE ',
+                'subtitle' => $type->description,
+                'code' => $type->code,
                 'number_note' => $notepettyCash->number_note,
                 'date' => Carbon::now()->format('Y'),
                 'employee' => $employee
@@ -190,6 +232,7 @@ class ProductController extends Controller
                 'products' => $products,
                 'concept' => $notepettyCash->concept,
                 'total' => $totalDesembolso,
+                'total_lit' => $this->numero_a_letras($totalDesembolso),
             ];
 
             $pdf = Pdf::loadView('NotePettyCash.NotePettyCash', $data);
@@ -210,7 +253,9 @@ class ProductController extends Controller
                 }, 0);
 
                 $data = [
-                    'title' => 'VALE DE CAJA CHICA',
+                    'title' => 'VALE DE ',
+                    'subtitle' => $type->description,
+                    'code' => $type->code,
                     'number_note' => $notepettyCash->number_note,
                     'date' => Carbon::now()->format('Y'),
                     'employee' => $employee
@@ -220,6 +265,7 @@ class ProductController extends Controller
                     'products' => $products,
                     'concept' => $notepettyCash->concept,
                     'total' => $totalDesembolso,
+                    'total_lit' => $this->numero_a_letras($totalDesembolso),
                 ];
 
                 $pdf = Pdf::loadView('NotePettyCash.NotePettyCash', $data);
@@ -290,7 +336,6 @@ class ProductController extends Controller
                 return response()->json(['error' => 'PettyCash not found.'], 404);
             }
 
-
             if ($pettyCash->fund_id != $fund->id) {
                 $pettyCash->fund_id = $fund->id;
             }
@@ -303,27 +348,28 @@ class ProductController extends Controller
                 if (!$product) {
                     return response()->json(['error' => 'Product not found.'], 404);
                 }
-
-                $product->group_id = $productData['id_group'];
-                $product->save();
                 $sum_product += $productData['total'];
 
                 $pettyCash->products()->syncWithoutDetaching([
                     $product->id => [
                         'supplier' => $productData['supplier'],
                         'number_invoice' => $productData['numer_invoice'],
-                        'costFinal' => $productData['total'],
+                        'quantity_delivered' => $productData['amount'],
+                        'costDetailsFinal' => $productData['costUnit'],
+                        'costTotal' => $productData['total'],
                     ],
                 ]);
             }
 
             $pettyCash->replacement_cost = $sum_product;
             $pettyCash->delivery_date = today()->toDateString();
-            $pettyCash->state = 'Finalizado';
+            $pettyCash->comment_recived = 'Aun no puede imprimir';
+            $pettyCash->state = 'Aceptado';
             $pettyCash->save();
 
             return response()->json(['message' => 'Petty cash updated successfully.'], 200);
         } catch (\Exception $e) {
+            logger($e);
             return response()->json([
                 'error' => 'An error occurred while saving petty cash.',
                 'message' => $e->getMessage(),
@@ -331,33 +377,131 @@ class ProductController extends Controller
         }
     }
 
+    public function change_petty_cash_to_replenishment_of_funds(Request $request)
+    {
+        return DB::transaction(function () use ($request) {
+
+            $from = PettyCash::with('products')->findOrFail($request['requestId']);
+
+            $to = PettyCash::create([
+                'number_note' => $from->number_note,
+                'concept' => $from->concept,
+                'request_date' => $from->request_date,
+                'delivery_date' => today()->toDateString(),
+                'comment_recived' => 'Aun no puede imprimir',
+                'approximate_cost' => $from->approximate_cost,
+                'replacement_cost' => $from->replacement_cost,
+                'state' => 'Aceptado',
+                'user_register' => $from->user_register,
+                'management_id' => $from->management_id,
+                'fund_id' => $from->fund_id,
+                'type_cash_id' => 2,
+            ]);
+
+            $pivotData = $from->products->mapWithKeys(function ($product) {
+                return [
+                    $product->id => [
+                        'supplier' => $product->pivot->supplier,
+                        'number_invoice'  => $product->pivot->number_invoice,
+                        'quantity_delivered' => $product->pivot->quantity_delivered,
+                        'costDetailsFinal' => $product->pivot->costDetailsFinal,
+                        'costTotal' => $product->pivot->costTotal,
+                        'amount_request' => $product->pivot->amount_request,
+                        'name_product' => $product->pivot->name_product,
+                        'costDetails' => $product->pivot->costDetails,
+                        'costFinal' => $product->pivot->costFinal,
+                    ]
+                ];
+            })->toArray();
+
+            $from->delete();
+
+            $to->products()->sync($pivotData);
+
+
+            $sum_product = 0;
+
+            foreach ($request['products'] as $productData) {
+                $product = Product::where('description', $productData['description'])->first();
+
+                if (!$product) {
+                    return response()->json(['error' => 'Product not found.'], 404);
+                }
+                $sum_product += $productData['total'];
+
+                $to->products()->syncWithoutDetaching([
+                    $product->id => [
+                        'supplier' => $productData['supplier'],
+                        'number_invoice' => $productData['numer_invoice'],
+                        'amount_request' => $productData['amount'],
+                        'quantity_delivered' => $productData['amount'],
+                        'costDetailsFinal' => $productData['costUnit'],
+                        'costDetails' => $productData['costUnit'],
+                        'costTotal' => $productData['total'],
+                    ],
+                ]);
+            }
+
+            $to->replacement_cost = $sum_product;
+            $to->approximate_cost = $sum_product;
+
+            $to->save();
+
+            return response()->json([
+                'from_note_id' => $from->id,
+                'to_note_id' => $to->id,
+                'products_copied' => count($pivotData),
+            ], 201);
+        });
+    }
+
     public function print_Petty_Cash_discharge(PettyCash $notepettyCash)
     {
         $requests_date = $notepettyCash->request_date;
+        $type = TypePetty::whereId($notepettyCash->type_cash_id)->first();
+
         $products = $notepettyCash->products()->get()->map(function ($product) {
             $group = Group::where('id', $product->group_id)->first();
             $codeGroup = $group ? $group->code : null;
             return [
-                'description' => $product->description,
-                'quantity' => $product->pivot->amount_request,
                 'supplier' => $product->pivot->supplier,
                 'number_invoice' => $product->pivot->number_invoice,
-                'cost_object' => $product->cost_object,
+                'description' => $product->description,
+                'quantity' => $product->pivot->quantity_delivered,
                 'code_group' => $codeGroup,
-                'price' => $product->pivot->costDetails,
-                'total' =>  $product->pivot->costFinal
+                'price' => $product->pivot->costDetailsFinal,
+                'total' =>  $product->pivot->costTotal
             ];
         });
 
         $data = [
-            'title' => 'DESCARGO DE CAJA CHICA',
+            'title' => 'DESCARGO DE ',
+            'subtitle' => $type->description,
+            'code' => $type->code,
             'number_note' => $notepettyCash->number_note,
             'date' => Carbon::now()->format('Y'),
             'request_date' => $requests_date,
             'concept' => $notepettyCash->concept,
-            'products' => $products
+            'products' => $products,
+            'total_petty_cash' => $notepettyCash->approximate_cost
         ];
         $pdf = Pdf::loadView('NotePettyCash.NotePettyCashForm', $data);
         return $pdf->download('Vale_caja_chica_form_2.pdf');
+    }
+
+    private function numero_a_letras($numero)
+    {
+        $formatter = new NumberFormatter("es", NumberFormatter::SPELLOUT);
+
+        $partes = explode('.', number_format($numero, 2, '.', ''));
+
+        $entero = intval($partes[0]);
+        $decimal = intval($partes[1]);
+
+        $literal = ucfirst($formatter->format($entero));
+
+        $literal .= " con " . str_pad($decimal, 2, "0", STR_PAD_RIGHT) . "/100";
+
+        return $literal;
     }
 }

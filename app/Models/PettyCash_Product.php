@@ -12,7 +12,7 @@ class PettyCash_Product extends Model
 
     protected $table = 'petty_cash_products';
 
-    protected $fillable = ['petty_cash_id', 'product_id', 'amount_request', 'number_invoice', 'name_product', 'supplier', 'costDetails', 'costFinal'];
+    protected $fillable = ['petty_cash_id', 'product_id', 'amount_request', 'number_invoice', 'name_product', 'supplier', 'costDetails', 'costFinal', 'quantity_delivered', 'costDetailsFinal', 'costTotal'];
 
     public function product()
     {

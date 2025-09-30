@@ -6,97 +6,6 @@ $max_requests = 7;
 
 $dns = new DNS2D();
 
-function convertirNumeroALetras($numero)
-{
-    $unidades = [
-        '',
-        'uno',
-        'dos',
-        'tres',
-        'cuatro',
-        'cinco',
-        'seis',
-        'siete',
-        'ocho',
-        'nueve',
-        'diez',
-        'once',
-        'doce',
-        'trece',
-        'catorce',
-        'quince',
-        'dieciséis',
-        'diecisiete',
-        'dieciocho',
-        'diecinueve'
-    ];
-    $decenas = [
-        '',
-        '',
-        'veinte',
-        'treinta',
-        'cuarenta',
-        'cincuenta',
-        'sesenta',
-        'setenta',
-        'ochenta',
-        'noventa'
-    ];
-    $centenas = [
-        '',
-        'ciento',
-        'doscientos',
-        'trescientos',
-        'cuatrocientos',
-        'quinientos',
-        'seiscientos',
-        'setecientos',
-        'ochocientos',
-        'novecientos'
-    ];
-
-    if ($numero == 0) {
-        return 'cero';
-    }
-
-    if ($numero < 20) {
-        return $unidades[$numero];
-    }
-
-    if ($numero < 100) {
-        $decena = intval($numero / 10);
-        $unidad = $numero % 10;
-        return $unidad == 0 ? $decenas[$decena] : $decenas[$decena] . ' y ' . $unidades[$unidad];
-    }
-
-    if ($numero < 1000) {
-        $centena = intval($numero / 100);
-        $resto = $numero % 100;
-        if ($numero == 100) {
-            return 'cien';
-        }
-        return $centenas[$centena] . ($resto > 0 ? ' ' . convertirNumeroALetras($resto) : '');
-    }
-
-    if ($numero < 1000000) {
-        $miles = intval($numero / 1000);
-        $resto = $numero % 1000;
-        $textoMiles = $miles == 1 ? 'mil' : convertirNumeroALetras($miles) . ' mil';
-        return $resto > 0 ? $textoMiles . ' ' . convertirNumeroALetras($resto) : $textoMiles;
-    }
-
-    if ($numero < 1000000000) {
-        $millones = intval($numero / 1000000);
-        $resto = $numero % 1000000;
-        $textoMillones = $millones == 1 ? 'un millón' : convertirNumeroALetras($millones) . ' millones';
-        return $resto > 0 ? $textoMillones . ' ' . convertirNumeroALetras($resto) : $textoMillones;
-    }
-
-    return 'Número demasiado grande';
-}
-
-$total_literal = convertirNumeroALetras($total);
-
 ?>
 
 <!DOCTYPE html>
@@ -196,7 +105,7 @@ $total_literal = convertirNumeroALetras($total);
                     <tbody>
                         <tr>
                             <td class="text-center bg-grey-darker text-white">Nº </td>
-                            <td class="text-center text-xxs"> CCH / {{ $number_note }} </td>
+                            <td class="text-center text-xxs"> {{$code}} / {{ $number_note }} </td>
                         </tr>
                         <tr>
                             <td class="text-center bg-grey-darker text-white">Fecha</td>
@@ -210,7 +119,7 @@ $total_literal = convertirNumeroALetras($total);
     <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
     <div class="block">
         <div class="leading-tight text-sm text-center m-b-10">FORMULARIO N° 1</div>
-        <div class="leading-tight text-sm text-center m-b-10">{{ $title }}</div>
+        <div class="leading-tight text-sm text-center m-b-10">{{ $title }}{{ $subtitle }}</div>
     </div>
     <div class="leading-tight text-sm text-left m-b-10">
         <strong>DESEMBOLSO:</strong>
@@ -224,15 +133,12 @@ $total_literal = convertirNumeroALetras($total);
                 <td class="w-75 p-l-5 table-large-font">{{ number_format($total, 2) }} Bs.</td>
             </tr>
             <tr>
-                <td class="w-75 p-l-5 table-large-font">{{ $total_literal }} 00/100 BOLIVIANOS</td>
+                <td class="w-75 p-l-5 table-large-font">{{ $total_lit }}</td>
             </tr>
         </tbody>
     </table>
     <div class="leading-tight text-sm text-left m-b-10">
-        <strong>POR CONCEPTO:</strong>
-    </div>
-    <div class="leading-tight text-sm text-left m-b-10">
-        {{$concept}}
+        <strong>POR CONCEPTO: {{$concept}}</strong>
     </div>
     <div class="leading-tight text-sm text-left m-b-10">
         <strong>SOLICITADO:</strong>
@@ -253,8 +159,8 @@ $total_literal = convertirNumeroALetras($total);
                 <td class="text-center">{{ ++$i }}</td>
                 <td class="text-center">{{ $product['description'] }}</td>
                 <td class="text-center">{{ $product['quantity'] }}</td>
-                <td class="text-center">{{ number_format($product['price'],2) }}</td>
-                <td class="text-center">{{ number_format(($product['quantity'] * $product['price']),2) }}</td>
+                <td class="text-right">{{ number_format($product['price'],2) }}</td>
+                <td class="text-right">{{ number_format(($product['quantity'] * $product['price']),2) }}</td>
             </tr>
             @endforeach
             @for($i = sizeof($products) + 1; $i <= $max_requests; $i++)
@@ -264,7 +170,7 @@ $total_literal = convertirNumeroALetras($total);
                 @endfor
                 <tr>
                     <td class="text-center" colspan="4"><strong>TOTAL</strong></td>
-                    <td class="text-center"><strong>{{ number_format($products->sum(function($product) {return $product['price'] * $product['quantity'];}), 2) }}</strong></td>
+                    <td class="text-right"><strong>{{ number_format($products->sum(function($product) {return $product['price'] * $product['quantity'];}), 2) }}</strong></td>
                 </tr>
         </tbody>
     </table>

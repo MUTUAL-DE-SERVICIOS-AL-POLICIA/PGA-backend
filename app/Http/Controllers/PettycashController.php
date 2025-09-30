@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\Ldap;
 use App\Models\Employee;
 use App\Models\Fund;
 use App\Models\Group;
 use App\Models\PettyCash;
 use App\Models\Product;
+use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -305,5 +307,103 @@ class PettycashController extends Controller
         ]);
 
         return response()->json($newFund, 201);
+    }
+
+    public function listNotePettyCashes(Request $request)
+    {
+        $page = max(0, $request->get('page', 0));
+        $limit = max(1, $request->get('limit', PettyCash::count()));
+        $start = $page * $limit;
+
+        $notes = PettyCash::with(['products' => function ($q) {
+            $q->select('products.id', 'description');
+        }])
+            ->whereIn('state', ['Aceptado', 'Finalizado'])
+            ->orderByDesc('id')
+            ->get(['id', 'number_note', 'concept', 'request_date', 'approximate_cost', 'state', 'comment_recived', 'user_register', 'delivery_date']);
+
+        $totalNotePetty = $notes->count();
+
+        $notes = $notes->slice($start, $limit)->values();
+
+        $data = $notes->map(function ($n) {
+            $positionName = $this->titlePerson($n->user_register);
+
+            $user = User::where('employee_id', $n->user_register)->first();
+
+            if (!$user) {
+                $employee = Employee::where('id', $n->user_register)->first();
+            } else {
+                $employee = Employee::find($n->user_register);
+            }
+
+            return [
+                'id' => $n->id,
+                'number_note' => $n->number_note,
+                'concept' => $n->concept,
+                'request_date' => (string) $n->request_date,
+                'delivery_date' => (string) $n->delivery_date,
+                'approximate_cost' => $n->approximate_cost,
+                'state' => $n->state,
+                'employee' => "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}",
+                'username' => $positionName,
+                'comment_recived' => $n->comment_recived,
+                'products' => $n->products->map(function ($p) {
+                    return [
+                        'product_id' => $p->id,
+                        'description' => $p->description,
+                        'costDetail' => optional($p->pivot)->costDetails,
+                        'amount_request' => optional($p->pivot)->amount_request,
+                        'quantity_delivered' => optional($p->pivot)->quantity_delivered,
+                        'invoice_number' => optional($p->pivot)->number_invoice,
+                    ];
+                })->values(),
+            ];
+        })->values();
+
+        return response()->json([
+            'status' => 'success',
+            'total' =>  $totalNotePetty,
+            'page' => $page,
+            'last_page' => ceil($totalNotePetty / $limit),
+            'data' => $data
+        ]);
+    }
+
+    public function deliveredGroupProduct(Request $request)
+    {
+        $items = $request->input('items', []);
+
+        foreach ($items as $item) {
+            Product::whereKey($item['productId'])->update(['group_id' => $item['groupId']]);
+        }
+
+        $note = PettyCash::with('products')->findOrFail($request->notePettyCashId);
+        $note->comment_recived = '';
+        $note->state = 'Finalizado';
+        $note->save();
+
+        return response()->json([
+            'note' => $note,
+            'status' => true,
+            'message' => 'Se modificaron los grupos'
+        ], 200);
+    }
+
+    public function titlePerson($idPersona)
+    {
+
+        $ldap = new Ldap();
+        $user = $ldap->get_entry($idPersona, 'id');
+        if ($user && isset($user['title'])) {
+            return $user['title'];
+        }
+        return null;
+    }
+
+    public function changes_funds(Request $request){
+        //Actualizar los fondos iniciados 
+        logger($request);
+        
     }
 }
