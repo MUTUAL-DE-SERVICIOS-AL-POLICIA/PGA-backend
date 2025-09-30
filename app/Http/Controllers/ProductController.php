@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\Ldap;
 use App\Models\Employee;
 use App\Models\Fund;
 use App\Models\Group;
@@ -149,36 +150,24 @@ class ProductController extends Controller
             return false;
         }
     }
+    public function titlePerson($idPersona)
+    {
+        $ldap = new Ldap();
+        $user = $ldap->get_entry($idPersona, 'id');
+
+        if ($user && isset($user['title'])) {
+            return $user['title'];
+        }
+
+        return null;
+    }
 
     public function print_Petty_Cash(PettyCash $notepettyCash)
     {
+        $positionName = $this->titlePerson($notepettyCash->user_register);
         $user = User::where('employee_id', $notepettyCash->user_register)->first();
         if ($user) {
-            $cargo = DB::table('public.contracts as c')
-                ->join('public.positions as p', 'c.position_id', '=', 'p.id')
-                ->join('public.employees as e', 'c.employee_id', '=', 'e.id')
-                ->join('public.position_groups as pg', 'p.position_group_id', '=', 'pg.id')
-                ->select('c.employee_id', 'e.first_name', 'e.last_name', 'e.mothers_last_name', 'p.name as position_name', 'pg.name as group_name', 'pg.id as group_id')
-                ->where('c.active', true)
-                ->whereNull('c.deleted_at')
-                ->whereIn('pg.id', [7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
-                ->where('c.employee_id', $notepettyCash->user_register)
-                ->unionAll(
-                    DB::table('public.consultant_contracts as cc')
-                        ->join('public.consultant_positions as cp', 'cc.consultant_position_id', '=', 'cp.id')
-                        ->join('public.employees as e', 'cc.employee_id', '=', 'e.id')
-                        ->join('public.position_groups as pg', 'cp.position_group_id', '=', 'pg.id')
-                        ->select('cc.employee_id', 'e.first_name', 'e.last_name', 'e.mothers_last_name', 'cp.name as position_name', 'pg.name as group_name', 'pg.id as group_id')
-                        ->where('cc.active', true)
-                        ->whereNull('cc.deleted_at')
-                        ->whereIn('pg.id', [7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
-                        ->where('cc.employee_id', $notepettyCash->user_register)
-                )
-                ->get();
-            $positionName = isset($cargo[0]) ? $cargo[0]->position_name : null;
             $employee = Employee::find($notepettyCash->user_register);
-
-
             $products = $notepettyCash->products()->get()->map(function ($product) {
                 return [
                     'description' => $product->description,
@@ -208,16 +197,7 @@ class ProductController extends Controller
         } else {
             $employee = Employee::where('id', $notepettyCash->user_register)->first();
             if ($employee) {
-                $position = DB::selectOne('select cp."name" 
-                           from public.consultant_contracts cc, public.consultant_positions cp 
-                           where cc.employee_id = ? 
-                           and cp.id = cc.consultant_position_id 
-                           order by cc.consultant_position_id desc 
-                           limit 1', [$notepettyCash->user_register]);
-                $positionName = $position ? $position->name : null;
                 $employee = Employee::find($notepettyCash->user_register);
-
-
                 $products = $notepettyCash->products()->get()->map(function ($product) {
                     return [
                         'description' => $product->description,

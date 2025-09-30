@@ -9,15 +9,41 @@ use App\Models\Material;
 use App\Models\Note_Entrie;
 use App\Models\NoteRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Exports\KardexExport;
+use App\Exports\ValuedPhysicalExport;
+use App\Exports\ConsolidatedValuedPhysicalInventoryExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
     public function kardex($materialId)
     {
         try {
-            $endDate = request()->query('end_date');
+            $latestManagement = Management::latest('id')->first();
+
+            if ($latestManagement) {
+                $material_balance = Material::findOrFail($materialId);
+                $balance = $material_balance->noteEntries()
+                    ->where('management_id', $latestManagement->id)
+                    ->where('observation', 'Saldo trasladado')
+                    ->orderBy('number_note', 'asc')
+                    ->get();
+
+                $amountEntriesTotal = 0;
+                $costTotalTotal = 0;
+
+                if ($balance) {
+                    foreach ($balance as $entry) {
+                        $amountEntriesTotal += $entry->pivot->amount_entries;
+                        $costTotalTotal += $entry->pivot->cost_total;
+                    }
+                }
+            }
+            $startDate = request()->query('start_date');
+            $endDate = Carbon::parse(request()->query('end_date'))->addDay()->toDateString();
             $latestManagement = Management::latest('id')->first();
             $material = Material::findOrFail($materialId);
             $group_material = $material->group()->first()->name_group;
@@ -25,11 +51,12 @@ class ReportController extends Controller
             $kardex = [];
             $stock = 0;
             $max_total = 0;
+            $fifoQueue = [];
 
             $entries = $material->noteEntries()
                 ->where('management_id', $latestManagement->id)
                 ->where('delivery_date', '<=', $endDate)
-                ->orderBy('delivery_date', 'asc')
+                ->orderBy('number_note', 'asc')
                 ->get();
 
             $requests = $material->noteRequests()
@@ -45,7 +72,7 @@ class ReportController extends Controller
                 $movements[] = [
                     'date' => $entry->pivot->created_at,
                     'type' => 'entry',
-                    'description' => $entry->name_supplier . ' - Nota de Entrada #' . $entry->number_note,
+                    'description' => 'Nota de Entrada # ' . $entry->number_note,
                     'quantity' => $entry->pivot->amount_entries,
                     'cost_unit' => $entry->pivot->cost_unit,
                 ];
@@ -64,8 +91,6 @@ class ReportController extends Controller
 
             usort($movements, fn($a, $b) => strtotime($a['date']) <=> strtotime($b['date']));
 
-            $fifoQueue = [];
-
             foreach ($movements as $movement) {
                 $fecha = date('Y-m-d', strtotime($movement['date']));
 
@@ -78,45 +103,48 @@ class ReportController extends Controller
                     $importeEntrada = $movement['quantity'] * $movement['cost_unit'];
                     $max_total += $importeEntrada;
 
-                    $kardex[] = [
-                        'date' => $fecha,
-                        'description' => $movement['description'],
-                        'entradas' => $movement['quantity'],
-                        'salidas' => 0,
-                        'stock_fisico' => $stock,
-                        'cost_unit' => round($movement['cost_unit'], 2),
-                        'importe_entrada' => round($importeEntrada, 2),
-                        'importe_salida' => 0,
-                        'importe_saldo' => round($max_total, 2),
-                    ];
+                    if (!$startDate || $fecha >= $startDate) {
+                        $kardex[] = [
+                            'date' => $fecha,
+                            'description' => $movement['description'],
+                            'entradas' => $movement['quantity'],
+                            'salidas' => 0,
+                            'stock_fisico' => $stock,
+                            'cost_unit' => round($movement['cost_unit'], 2),
+                            'importe_entrada' => round($importeEntrada, 2),
+                            'importe_salida' => 0,
+                            'importe_saldo' => round($max_total, 2),
+                        ];
+                    }
                 } else {
                     $quantityToDeliver = $movement['quantity'];
                     $importeSalidaTotal = 0;
 
                     while ($quantityToDeliver > 0 && count($fifoQueue) > 0) {
                         $fifoItem = array_shift($fifoQueue);
-
                         $usedQuantity = min($quantityToDeliver, $fifoItem['quantity']);
                         $costUnit = $fifoItem['cost_unit'];
                         $importeSalida = $usedQuantity * $costUnit;
                         $importeSalidaTotal += $importeSalida;
                         $max_total -= $importeSalida;
-
                         $stock -= $usedQuantity;
 
-                        $kardex[] = [
-                            'date' => $fecha,
-                            'description' => $movement['description'],
-                            'entradas' => 0,
-                            'salidas' => $usedQuantity,
-                            'stock_fisico' => $stock,
-                            'cost_unit' => round($costUnit, 2),
-                            'importe_entrada' => 0,
-                            'importe_salida' => round($importeSalida, 2),
-                            'importe_saldo' => round($max_total, 2),
-                        ];
+                        if (!$startDate || $fecha >= $startDate) {
+                            $kardex[] = [
+                                'date' => $fecha,
+                                'description' => $movement['description'],
+                                'entradas' => 0,
+                                'salidas' => $usedQuantity,
+                                'stock_fisico' => $stock,
+                                'cost_unit' => round($costUnit, 2),
+                                'importe_entrada' => 0,
+                                'importe_salida' => round($importeSalida, 2),
+                                'importe_saldo' => round($max_total, 2),
+                            ];
+                        }
 
                         $quantityToDeliver -= $usedQuantity;
+
                         if ($fifoItem['quantity'] > $usedQuantity) {
                             $fifoItem['quantity'] -= $usedQuantity;
                             array_unshift($fifoQueue, $fifoItem);
@@ -124,23 +152,65 @@ class ReportController extends Controller
                     }
                 }
             }
+            $totalEntradas = collect($kardex)->sum('entradas');
+            $totalSalidas = collect($kardex)->sum('salidas');
+            $totalStock = collect($kardex)->last()['stock_fisico'] ?? 0;
+            $totalImporteEntrada = collect($kardex)->sum('importe_entrada');
+            $totalImporteSalida = collect($kardex)->sum('importe_salida');
+            $totalImporteSaldo = collect($kardex)->last()['importe_saldo'] ?? 0;
+
+            $totales = [
+                'entradas' => $totalEntradas,
+                'salidas' => $totalSalidas,
+                'stock_fisico' => $totalStock,
+                'importe_entrada' => round($totalImporteEntrada, 2),
+                'importe_salida' => round($totalImporteSalida, 2),
+                'importe_saldo' => round($totalImporteSaldo, 2),
+            ];
 
             return response()->json([
                 'code_material' => $material->code_material,
                 'description' => $material->description,
                 'unit_material' => $material->unit_material,
                 'group' => strtoupper($group_material),
-                'kardex_de_existencia' => $kardex
+                'kardex_de_existencia' => $kardex,
+                'totales' => $totales,
+                'balance_amount_entries' => $amountEntriesTotal,
+                'balance_cost_total' => $costTotalTotal
             ]);
         } catch (\Exception $e) {
             logger($e->getMessage());
             return response()->json(['error' => 'No se pudo generar el Kardex'], 500);
         }
     }
-    public function print_kardex($materialId)
+
+    public function print_kardex_excel($materialId)
     {
         try {
-            $endDate = request()->query('end_date');
+            $latestManagement = Management::latest('id')->first();
+
+            if ($latestManagement) {
+                $material_balance = Material::findOrFail($materialId);
+                $balance = $material_balance->noteEntries()
+                    ->where('management_id', $latestManagement->id)
+                    ->where('observation', 'Saldo trasladado')
+                    ->orderBy('number_note', 'asc')
+                    ->get();
+
+                $amountEntriesTotal = 0;
+                $costTotalTotal = 0;
+
+                if ($balance) {
+                    foreach ($balance as $entry) {
+                        $amountEntriesTotal += $entry->pivot->amount_entries;
+                        $costTotalTotal += $entry->pivot->cost_total;
+                    }
+                }
+            }
+
+
+            $startDate = request()->query('start_date');
+            $endDate = Carbon::parse(request()->query('end_date'))->addDay()->toDateString();
             $latestManagement = Management::latest('id')->first();
             $material = Material::findOrFail($materialId);
             $group_material = $material->group()->first()->name_group;
@@ -148,11 +218,170 @@ class ReportController extends Controller
             $kardex = [];
             $stock = 0;
             $max_total = 0;
+            $fifoQueue = [];
 
             $entries = $material->noteEntries()
                 ->where('management_id', $latestManagement->id)
                 ->where('delivery_date', '<=', $endDate)
-                ->orderBy('delivery_date', 'asc')
+                ->orderBy('number_note', 'asc')
+                ->get();
+
+            $requests = $material->noteRequests()
+                ->where('management_id', $latestManagement->id)
+                ->where('state', '=', 'Aceptado')
+                ->where('received_on_date', '<=', $endDate)
+                ->orderBy('received_on_date', 'asc')
+                ->get();
+
+            $movements = [];
+
+            foreach ($entries as $entry) {
+                $movements[] = [
+                    'date' => $entry->pivot->created_at,
+                    'type' => 'entry',
+                    'description' => $entry->name_supplier . ' - Nota de Entrada #' . $entry->number_note,
+                    'quantity' => $entry->pivot->amount_entries,
+                    'cost_unit' => $entry->pivot->cost_unit,
+                ];
+            }
+
+            foreach ($requests as $request) {
+                $employee = Employee::find($request->user_register);
+                $movements[] = [
+                    'date' => $request->pivot->created_at,
+                    'type' => 'exit',
+                    'description' => ucwords(strtolower("{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}")) . ' - Solicitud #' . $request->id,
+                    'quantity' => $request->pivot->delivered_quantity,
+                    'cost_unit' => null,
+                ];
+            }
+
+            usort($movements, fn($a, $b) => strtotime($a['date']) <=> strtotime($b['date']));
+            foreach ($movements as $movement) {
+                $fecha = date('Y-m-d', strtotime($movement['date']));
+
+                if ($movement['type'] === 'entry') {
+                    $fifoQueue[] = [
+                        'quantity' => $movement['quantity'],
+                        'cost_unit' => $movement['cost_unit'],
+                    ];
+                    $stock += $movement['quantity'];
+                    $importeEntrada = $movement['quantity'] * $movement['cost_unit'];
+                    $max_total += $importeEntrada;
+
+                    if (!$startDate || $fecha >= $startDate) {
+                        $kardex[] = [
+                            'date' => $fecha,
+                            'description' => $movement['description'],
+                            'entradas' => $movement['quantity'],
+                            'salidas' => 0,
+                            'stock_fisico' => $stock,
+                            'cost_unit' => round($movement['cost_unit'], 2),
+                            'importe_entrada' => round($importeEntrada, 2),
+                            'importe_salida' => 0,
+                            'importe_saldo' => round($max_total, 2),
+                        ];
+                    }
+                } else {
+                    $quantityToDeliver = $movement['quantity'];
+                    $importeSalidaTotal = 0;
+
+                    while ($quantityToDeliver > 0 && count($fifoQueue) > 0) {
+                        $fifoItem = array_shift($fifoQueue);
+                        $usedQuantity = min($quantityToDeliver, $fifoItem['quantity']);
+                        $costUnit = $fifoItem['cost_unit'];
+                        $importeSalida = $usedQuantity * $costUnit;
+                        $importeSalidaTotal += $importeSalida;
+                        $max_total -= $importeSalida;
+                        $stock -= $usedQuantity;
+
+                        if (!$startDate || $fecha >= $startDate) {
+                            $kardex[] = [
+                                'date' => $fecha,
+                                'description' => $movement['description'],
+                                'entradas' => 0,
+                                'salidas' => $usedQuantity,
+                                'stock_fisico' => $stock,
+                                'cost_unit' => round($costUnit, 2),
+                                'importe_entrada' => 0,
+                                'importe_salida' => round($importeSalida, 2),
+                                'importe_saldo' => round($max_total, 2),
+                            ];
+                        }
+
+                        $quantityToDeliver -= $usedQuantity;
+
+                        if ($fifoItem['quantity'] > $usedQuantity) {
+                            $fifoItem['quantity'] -= $usedQuantity;
+                            array_unshift($fifoQueue, $fifoItem);
+                        }
+                    }
+                }
+            }
+            $totalEntradas = collect($kardex)->sum('entradas');
+            $totalSalidas = collect($kardex)->sum('salidas');
+            $totalStock = collect($kardex)->last()['stock_fisico'] ?? 0;
+            $totalImporteEntrada = collect($kardex)->sum('importe_entrada');
+            $totalImporteSalida = collect($kardex)->sum('importe_salida');
+            $totalImporteSaldo = collect($kardex)->last()['importe_saldo'] ?? 0;
+
+            $totales = [
+                'entradas' => $totalEntradas,
+                'salidas' => $totalSalidas,
+                'stock_fisico' => $totalStock,
+                'importe_entrada' => round($totalImporteEntrada, 2),
+                'importe_salida' => round($totalImporteSalida, 2),
+                'importe_saldo' => round($totalImporteSaldo, 2),
+            ];
+
+            // Download Excel file
+            return Excel::download(new KardexExport($kardex, $totales), 'Kardex_Existencias.xlsx');
+        } catch (\Exception $e) {
+            logger($e->getMessage());
+            return response()->json(['error' => 'No se pudo generar el Kardex'], 500);
+        }
+    }
+
+    public function print_kardex($materialId)
+    {
+        try {
+
+            $latestManagement = Management::latest('id')->first();
+
+            if ($latestManagement) {
+                $material_balance = Material::findOrFail($materialId);
+                $balance = $material_balance->noteEntries()
+                    ->where('management_id', $latestManagement->id)
+                    ->where('observation', 'Saldo trasladado')
+                    ->orderBy('number_note', 'asc')
+                    ->get();
+
+                $amountEntriesTotal = 0;
+                $costTotalTotal = 0;
+
+                if ($balance) {
+                    foreach ($balance as $entry) {
+                        $amountEntriesTotal += $entry->pivot->amount_entries;
+                        $costTotalTotal += $entry->pivot->cost_total;
+                    }
+                }
+            }
+            $startDate = request()->query('start_date');
+            $endDate = Carbon::parse(request()->query('end_date'))->addDay()->toDateString();
+            $dateof = request()->query('end_date');
+            $latestManagement = Management::latest('id')->first();
+            $material = Material::findOrFail($materialId);
+            $group_material = $material->group()->first()->name_group;
+
+            $kardex = [];
+            $stock = 0;
+            $max_total = 0;
+            $fifoQueue = [];
+
+            $entries = $material->noteEntries()
+                ->where('management_id', $latestManagement->id)
+                ->where('delivery_date', '<=', $endDate)
+                ->orderBy('number_note', 'asc')
                 ->get();
 
             $requests = $material->noteRequests()
@@ -187,8 +416,6 @@ class ReportController extends Controller
 
             usort($movements, fn($a, $b) => strtotime($a['date']) <=> strtotime($b['date']));
 
-            $fifoQueue = [];
-
             foreach ($movements as $movement) {
                 $fecha = date('Y-m-d', strtotime($movement['date']));
 
@@ -201,45 +428,48 @@ class ReportController extends Controller
                     $importeEntrada = $movement['quantity'] * $movement['cost_unit'];
                     $max_total += $importeEntrada;
 
-                    $kardex[] = [
-                        'date' => $fecha,
-                        'description' => $movement['description'],
-                        'entradas' => $movement['quantity'],
-                        'salidas' => 0,
-                        'stock_fisico' => $stock,
-                        'cost_unit' => round($movement['cost_unit'], 2),
-                        'importe_entrada' => round($importeEntrada, 2),
-                        'importe_salida' => 0,
-                        'importe_saldo' => round($max_total, 2),
-                    ];
+                    if (!$startDate || $fecha >= $startDate) {
+                        $kardex[] = [
+                            'date' => $fecha,
+                            'description' => $movement['description'],
+                            'entradas' => $movement['quantity'],
+                            'salidas' => 0,
+                            'stock_fisico' => $stock,
+                            'cost_unit' => round($movement['cost_unit'], 2),
+                            'importe_entrada' => round($importeEntrada, 2),
+                            'importe_salida' => 0,
+                            'importe_saldo' => round($max_total, 2),
+                        ];
+                    }
                 } else {
                     $quantityToDeliver = $movement['quantity'];
                     $importeSalidaTotal = 0;
 
                     while ($quantityToDeliver > 0 && count($fifoQueue) > 0) {
                         $fifoItem = array_shift($fifoQueue);
-
                         $usedQuantity = min($quantityToDeliver, $fifoItem['quantity']);
                         $costUnit = $fifoItem['cost_unit'];
                         $importeSalida = $usedQuantity * $costUnit;
                         $importeSalidaTotal += $importeSalida;
                         $max_total -= $importeSalida;
-
                         $stock -= $usedQuantity;
 
-                        $kardex[] = [
-                            'date' => $fecha,
-                            'description' => $movement['description'],
-                            'entradas' => 0,
-                            'salidas' => $usedQuantity,
-                            'stock_fisico' => $stock,
-                            'cost_unit' => round($costUnit, 2),
-                            'importe_entrada' => 0,
-                            'importe_salida' => round($importeSalida, 2),
-                            'importe_saldo' => round($max_total, 2),
-                        ];
+                        if (!$startDate || $fecha >= $startDate) {
+                            $kardex[] = [
+                                'date' => $fecha,
+                                'description' => $movement['description'],
+                                'entradas' => 0,
+                                'salidas' => $usedQuantity,
+                                'stock_fisico' => $stock,
+                                'cost_unit' => round($costUnit, 2),
+                                'importe_entrada' => 0,
+                                'importe_salida' => round($importeSalida, 2),
+                                'importe_saldo' => round($max_total, 2),
+                            ];
+                        }
 
                         $quantityToDeliver -= $usedQuantity;
+
                         if ($fifoItem['quantity'] > $usedQuantity) {
                             $fifoItem['quantity'] -= $usedQuantity;
                             array_unshift($fifoQueue, $fifoItem);
@@ -247,23 +477,48 @@ class ReportController extends Controller
                     }
                 }
             }
+            $totalEntradas = collect($kardex)->sum('entradas');
+            $totalSalidas = collect($kardex)->sum('salidas');
+            $totalStock = collect($kardex)->last()['stock_fisico'] ?? 0;
+            $totalImporteEntrada = collect($kardex)->sum('importe_entrada');
+            $totalImporteSalida = collect($kardex)->sum('importe_salida');
+            $totalImporteSaldo = collect($kardex)->last()['importe_saldo'] ?? 0;
 
+            $totales = [
+                'entradas' => $totalEntradas,
+                'salidas' => $totalSalidas,
+                'stock_fisico' => $totalStock,
+                'importe_entrada' => round($totalImporteEntrada, 2),
+                'importe_salida' => round($totalImporteSalida, 2),
+                'importe_saldo' => round($totalImporteSaldo, 2),
+            ];
+
+            $firstDay = date("Y-01-01");
+
+            $lastDayPrevYear = date("Y-m-d", strtotime("{$firstDay} -1 day"));
             $data = [
                 'title' => 'KARDEX DE EXISTENCIAS',
                 'code_material' => $material->code_material,
                 'description' => $material->description,
                 'unit_material' => $material->unit_material,
                 'group' => strtoupper($group_material),
-                'kardex_de_existencia' => $kardex
+                'kardex_de_existencia' => $kardex,
+                'totales' => $totales,
+                'start_date' => $startDate,
+                'end_date' => $dateof,
+                'firtsDay'=> $firstDay,
+                'lastDay'=> $lastDayPrevYear,
+                'balance_amount_entries' => $amountEntriesTotal,
+                'balance_cost_total' => $costTotalTotal
             ];
 
             $pdf = Pdf::loadView('Report_Kardex.ReportKardex', $data)->setPaper('letter', 'landscape');
             return $pdf->stream('Kardex de Existencia.pdf');
         } catch (\Exception $e) {
+            logger($e->getMessage());
             return response()->json(['error' => 'No se pudo generar el Kardex'], 500);
         }
     }
-
 
     public function dashboard_data()
     {
@@ -282,7 +537,6 @@ class ReportController extends Controller
             'num_delivery' => $num_delivery,
         ]);
     }
-
 
     public function kardexGeneral()
     {
@@ -427,7 +681,6 @@ class ReportController extends Controller
         }
     }
 
-
     public function ValuedPhysical(Request $request)
     {
         $startDate = $request->input('start_date');
@@ -511,9 +764,7 @@ class ReportController extends Controller
                         $lotes = &$notesData[$groupName]['materiales'][$materialCode]['lotes'];
 
                         foreach ($lotes as &$lote) {
-                            if ($deliveredQuantity <= 0) {
-                                break;
-                            }
+                            if ($deliveredQuantity <= 0) break;
 
                             if ($lote['cantidad'] >= $deliveredQuantity) {
                                 $lote['cantidad'] -= $deliveredQuantity;
@@ -527,6 +778,74 @@ class ReportController extends Controller
                 }
             }
         });
+        $previousManagement = Management::where('id', '<', $latestManagement->id)
+            ->orderByDesc('id')
+            ->first();
+
+        $saldosAnteriores = [];
+
+        if ($previousManagement) {
+            $saldosQuery = Note_Entrie::where('management_id', $previousManagement->id)
+                ->where('state', 'Aceptado')
+                ->with(['materials' => function ($query) {
+                    $query->select('materials.id', 'materials.description', 'materials.code_material', 'materials.group_id', 'materials.unit_material');
+                }, 'materials.group' => function ($query) {
+                    $query->select('groups.id', 'groups.name_group', 'groups.code');
+                }]);
+
+            $saldosQuery->chunk(100, function ($notes) use (&$saldosAnteriores) {
+                foreach ($notes as $note) {
+                    foreach ($note->materials as $material) {
+                        $saldo = (float) $material->pivot->request;
+                        if ($saldo <= 0) continue;
+
+                        $group = $material->group;
+                        $groupName = $group ? $group->name_group : 'Sin grupo';
+                        $groupCode = $group ? $group->code : null;
+                        $materialCode = $material->code_material;
+                        $materialName = $material->description;
+                        $materialUnit = $material->unit_material;
+                        $costUnit = (float) $material->pivot->cost_unit;
+                        $deliveryDate = $note->delivery_date;
+
+                        if (!isset($saldosAnteriores[$groupName])) {
+                            $saldosAnteriores[$groupName] = [
+                                'codigo_grupo' => $groupCode,
+                                'materiales' => []
+                            ];
+                        }
+
+                        $saldosAnteriores[$groupName]['materiales'][] = [
+                            'codigo_material' => $materialCode,
+                            'nombre_material' => $materialName,
+                            'unidad_material' => $materialUnit,
+                            'lotes' => [
+                                [
+                                    'fecha_ingreso' => $deliveryDate,
+                                    'cantidad_restante' => $saldo,
+                                    'precio_unitario' => $costUnit,
+                                    'valor_restante' => $saldo * $costUnit,
+                                ]
+                            ]
+                        ];
+                    }
+                }
+            });
+        }
+        $saldosIndexados = [];
+        foreach ($saldosAnteriores as $grupo) {
+            foreach ($grupo['materiales'] as $material) {
+                $codigo = $material['codigo_material'];
+                if (!isset($saldosIndexados[$codigo])) {
+                    $saldosIndexados[$codigo] = $material;
+                } else {
+                    $saldosIndexados[$codigo]['lotes'] = array_merge(
+                        $saldosIndexados[$codigo]['lotes'],
+                        $material['lotes']
+                    );
+                }
+            }
+        }
 
         $result = [];
         foreach ($notesData as $groupName => $groupData) {
@@ -535,8 +854,12 @@ class ReportController extends Controller
                 'codigo_grupo' => $groupData['codigo_grupo'],
                 'materiales' => []
             ];
+            $materialesOrdenados = $groupData['materiales'];
+            uksort($materialesOrdenados, function ($a, $b) {
+                return strcmp($a, $b);
+            });
 
-            foreach ($groupData['materiales'] as $materialCode => $materialData) {
+            foreach ($materialesOrdenados as $materialCode => $materialData) {
                 $materialLotes = array_map(function ($lote) {
                     return [
                         'fecha_ingreso' => $lote['fecha_ingreso'],
@@ -553,11 +876,49 @@ class ReportController extends Controller
                     'codigo_material' => $materialData['codigo_material'],
                     'nombre_material' => $materialData['nombre_material'],
                     'unidad_material' => $materialData['unidad_material'],
+                    'saldo_anterior' => $saldosIndexados[$materialCode]['lotes'] ?? [],
                     'lotes' => $materialLotes
                 ];
             }
 
-            $result[] = $groupResult;
+            $saldoAnteriorCantidad = 0;
+            $saldoAnteriorTotal = 0;
+            $entradasCantidad = 0;
+            $entradasTotal = 0;
+            $salidasCantidad = 0;
+            $salidasTotal = 0;
+            $saldoFinalCantidad = 0;
+            $saldoFinalTotal = 0;
+
+            foreach ($groupResult['materiales'] as $material) {
+                foreach ($material['saldo_anterior'] as $lote) {
+                    $saldoAnteriorCantidad += $lote['cantidad_restante'] ?? 0;
+                    $saldoAnteriorTotal += $lote['valor_restante'] ?? 0;
+                }
+                foreach ($material['lotes'] as $lote) {
+                    $entradasCantidad += $lote['cantidad_inicial'] ?? 0;
+                    $entradasTotal += $lote['cantidad_1'] ?? 0;
+                    $salidasCantidad += ($lote['cantidad_inicial'] - $lote['cantidad_restante']) ?? 0;
+                    $salidasTotal += $lote['cantidad_2'] ?? 0;
+                    $saldoFinalCantidad += $lote['cantidad_restante'] ?? 0;
+                    $saldoFinalTotal += $lote['cantidad_3'] ?? 0;
+                }
+            }
+
+            $groupResult['resumen'] = [
+                'saldo_anterior_cantidad' => $saldoAnteriorCantidad,
+                'saldo_anterior_total' => $saldoAnteriorTotal,
+                'entradas_cantidad' => $entradasCantidad,
+                'entradas_total' => $entradasTotal,
+                'salidas_cantidad' => $salidasCantidad,
+                'salidas_total' => $salidasTotal,
+                'saldo_final_cantidad' => $saldoFinalCantidad,
+                'saldo_final_total' => $saldoFinalTotal,
+            ];
+
+            if (!empty($groupResult['materiales'])) {
+                $result[] = $groupResult;
+            }
         }
 
         $note = Note_Entrie::getFirstNoteOfYear();
@@ -565,8 +926,14 @@ class ReportController extends Controller
 
         return response()->json([
             'date_note' => $formattedDate,
-            'data' => $result,
+            'data' => $result
         ]);
+    }
+
+    public function exportValuedInventoryExcel(Request $request)
+    {
+        $jsonData = $this->ValuedPhysical($request)->getData(true);
+        return Excel::download(new ValuedPhysicalExport($jsonData['data']), 'inventario_valorado.xlsx');
     }
 
     public function PrintValuedPhysical(Request $request)
@@ -652,9 +1019,7 @@ class ReportController extends Controller
                         $lotes = &$notesData[$groupName]['materiales'][$materialCode]['lotes'];
 
                         foreach ($lotes as &$lote) {
-                            if ($deliveredQuantity <= 0) {
-                                break;
-                            }
+                            if ($deliveredQuantity <= 0) break;
 
                             if ($lote['cantidad'] >= $deliveredQuantity) {
                                 $lote['cantidad'] -= $deliveredQuantity;
@@ -668,6 +1033,78 @@ class ReportController extends Controller
                 }
             }
         });
+
+        // Obtener saldos anteriores
+        $previousManagement = Management::where('id', '<', $latestManagement->id)
+            ->orderByDesc('id')
+            ->first();
+
+        $saldosAnteriores = [];
+
+        if ($previousManagement) {
+            $saldosQuery = Note_Entrie::where('management_id', $previousManagement->id)
+                ->where('state', 'Aceptado')
+                ->with(['materials' => function ($query) {
+                    $query->select('materials.id', 'materials.description', 'materials.code_material', 'materials.group_id', 'materials.unit_material');
+                }, 'materials.group' => function ($query) {
+                    $query->select('groups.id', 'groups.name_group', 'groups.code');
+                }]);
+
+            $saldosQuery->chunk(100, function ($notes) use (&$saldosAnteriores) {
+                foreach ($notes as $note) {
+                    foreach ($note->materials as $material) {
+                        $saldo = (float) $material->pivot->request;
+                        if ($saldo <= 0) continue;
+
+                        $group = $material->group;
+                        $groupName = $group ? $group->name_group : 'Sin grupo';
+                        $groupCode = $group ? $group->code : null;
+                        $materialCode = $material->code_material;
+                        $materialName = $material->description;
+                        $materialUnit = $material->unit_material;
+                        $costUnit = (float) $material->pivot->cost_unit;
+                        $deliveryDate = $note->delivery_date;
+
+                        if (!isset($saldosAnteriores[$groupName])) {
+                            $saldosAnteriores[$groupName] = [
+                                'codigo_grupo' => $groupCode,
+                                'materiales' => []
+                            ];
+                        }
+
+                        $saldosAnteriores[$groupName]['materiales'][] = [
+                            'codigo_material' => $materialCode,
+                            'nombre_material' => $materialName,
+                            'unidad_material' => $materialUnit,
+                            'lotes' => [
+                                [
+                                    'fecha_ingreso' => $deliveryDate,
+                                    'cantidad_restante' => $saldo,
+                                    'precio_unitario' => $costUnit,
+                                    'valor_restante' => $saldo * $costUnit,
+                                ]
+                            ]
+                        ];
+                    }
+                }
+            });
+        }
+
+        // Reindexar saldos anteriores
+        $saldosIndexados = [];
+        foreach ($saldosAnteriores as $grupo) {
+            foreach ($grupo['materiales'] as $material) {
+                $codigo = $material['codigo_material'];
+                if (!isset($saldosIndexados[$codigo])) {
+                    $saldosIndexados[$codigo] = $material;
+                } else {
+                    $saldosIndexados[$codigo]['lotes'] = array_merge(
+                        $saldosIndexados[$codigo]['lotes'],
+                        $material['lotes']
+                    );
+                }
+            }
+        }
 
         $result = [];
         foreach ($notesData as $groupName => $groupData) {
@@ -694,11 +1131,50 @@ class ReportController extends Controller
                     'codigo_material' => $materialData['codigo_material'],
                     'nombre_material' => $materialData['nombre_material'],
                     'unidad_material' => $materialData['unidad_material'],
+                    'saldo_anterior' => $saldosIndexados[$materialCode]['lotes'] ?? [],
                     'lotes' => $materialLotes
                 ];
             }
 
-            $result[] = $groupResult;
+            // Calcular totales del grupo
+            $saldoAnteriorCantidad = 0;
+            $saldoAnteriorTotal = 0;
+            $entradasCantidad = 0;
+            $entradasTotal = 0;
+            $salidasCantidad = 0;
+            $salidasTotal = 0;
+            $saldoFinalCantidad = 0;
+            $saldoFinalTotal = 0;
+
+            foreach ($groupResult['materiales'] as $material) {
+                foreach ($material['saldo_anterior'] as $lote) {
+                    $saldoAnteriorCantidad += $lote['cantidad_restante'] ?? 0;
+                    $saldoAnteriorTotal += $lote['valor_restante'] ?? 0;
+                }
+                foreach ($material['lotes'] as $lote) {
+                    $entradasCantidad += $lote['cantidad_inicial'] ?? 0;
+                    $entradasTotal += $lote['cantidad_1'] ?? 0;
+                    $salidasCantidad += ($lote['cantidad_inicial'] - $lote['cantidad_restante']) ?? 0;
+                    $salidasTotal += $lote['cantidad_2'] ?? 0;
+                    $saldoFinalCantidad += $lote['cantidad_restante'] ?? 0;
+                    $saldoFinalTotal += $lote['cantidad_3'] ?? 0;
+                }
+            }
+
+            $groupResult['resumen'] = [
+                'saldo_anterior_cantidad' => $saldoAnteriorCantidad,
+                'saldo_anterior_total' => $saldoAnteriorTotal,
+                'entradas_cantidad' => $entradasCantidad,
+                'entradas_total' => $entradasTotal,
+                'salidas_cantidad' => $salidasCantidad,
+                'salidas_total' => $salidasTotal,
+                'saldo_final_cantidad' => $saldoFinalCantidad,
+                'saldo_final_total' => $saldoFinalTotal,
+            ];
+
+            if (!empty($groupResult['materiales'])) {
+                $result[] = $groupResult;
+            }
         }
 
         $note = Note_Entrie::getFirstNoteOfYear();
@@ -706,7 +1182,7 @@ class ReportController extends Controller
 
         $data = [
             'title' => 'INVENTARIO FISICO VALORADO ALMACENES MUSERPOL',
-            'results' => $result,
+            'result' => $result,
             'date_note' => $formattedDate,
         ];
 
@@ -714,7 +1190,7 @@ class ReportController extends Controller
         return $pdf->stream('Inventario Fisico Valorado.pdf');
     }
 
-    public function ValuedPhysicalPrevis(Request $request)
+    public function print_consolidated_valued_physical_inventory(Request $request)
     {
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
@@ -724,7 +1200,7 @@ class ReportController extends Controller
         $notesQuery = Note_Entrie::where('management_id', $latestManagement->id)
             ->where('state', 'Aceptado')
             ->with(['materials' => function ($query) {
-                $query->select('materials.id', 'materials.group_id');
+                $query->select('materials.id', 'materials.description', 'materials.code_material', 'materials.group_id', 'materials.unit_material');
             }, 'materials.group' => function ($query) {
                 $query->select('groups.id', 'groups.name_group', 'groups.code');
             }]);
@@ -733,344 +1209,229 @@ class ReportController extends Controller
             $notesQuery->whereBetween('delivery_date', [$startDate, $endDate]);
         }
 
-        $groupTotals = [];
-
-        $notesQuery->chunk(100, function ($notes) use (&$groupTotals) {
+        $notesData = [];
+        $notesQuery->chunk(100, function ($notes) use (&$notesData) {
             foreach ($notes as $note) {
                 foreach ($note->materials as $material) {
                     $group = $material->group;
                     $groupName = $group ? $group->name_group : 'Sin grupo';
                     $groupCode = $group ? $group->code : null;
 
-                    $amountEntries = $material->pivot->amount_entries;
-                    $costUnit = $material->pivot->cost_unit;
-                    $totalCost = $amountEntries * $costUnit;
+                    $materialCode = $material->code_material;
+                    $materialName = $material->description;
+                    $materialUnit = $material->unit_material;
+                    $amountEntries = (float) $material->pivot->amount_entries;
+                    $costUnit = (float) $material->pivot->cost_unit;
+                    $deliveryDate = $note->delivery_date;
 
-                    if (!isset($groupTotals[$groupName])) {
-                        $groupTotals[$groupName] = [
+                    if (!isset($notesData[$groupName])) {
+                        $notesData[$groupName] = [
                             'codigo_grupo' => $groupCode,
-                            'total_cantidad' => 0,
-                            'total_presupuesto' => 0
+                            'materiales' => []
                         ];
                     }
 
-                    $groupTotals[$groupName]['total_cantidad'] += $amountEntries;
-                    $groupTotals[$groupName]['total_presupuesto'] += $totalCost;
+                    if (!isset($notesData[$groupName]['materiales'][$materialCode])) {
+                        $notesData[$groupName]['materiales'][$materialCode] = [
+                            'codigo_material' => $materialCode,
+                            'nombre_material' => $materialName,
+                            'unidad_material' => $materialUnit,
+                            'lotes' => []
+                        ];
+                    }
+
+                    $notesData[$groupName]['materiales'][$materialCode]['lotes'][] = [
+                        'fecha_ingreso' => $deliveryDate,
+                        'cantidad_inicial' => $amountEntries,
+                        'cantidad' => $amountEntries,
+                        'precio_unitario' => $costUnit
+                    ];
                 }
             }
         });
 
         $requestsQuery = NoteRequest::where('management_id', $latestManagement->id)
             ->with(['materials' => function ($query) {
-                $query->select('materials.id', 'materials.group_id');
+                $query->select('materials.id', 'materials.code_material', 'materials.group_id');
             }, 'materials.group' => function ($query) {
                 $query->select('groups.id', 'groups.name_group', 'groups.code');
-            }])
-            ->where('state', 'Aceptado');
+            }])->where('state', 'Aceptado');
 
         if ($startDate && $endDate) {
             $requestsQuery->whereBetween('received_on_date', [$startDate, $endDate]);
         }
 
-        $requestsQuery->chunk(100, function ($requests) use (&$groupTotals) {
+        $requestsQuery->chunk(100, function ($requests) use (&$notesData) {
             foreach ($requests as $request) {
                 foreach ($request->materials as $material) {
                     $group = $material->group;
                     $groupName = $group ? $group->name_group : 'Sin grupo';
-                    $deliveredQuantity = $material->pivot->delivered_quantity;
+                    $materialCode = $material->code_material;
+                    $deliveredQuantity = (float) $material->pivot->delivered_quantity;
 
-                    if (isset($groupTotals[$groupName])) {
-                        $groupTotals[$groupName]['total_cantidad'] -= $deliveredQuantity;
-                        $groupTotals[$groupName]['total_presupuesto'] -= $deliveredQuantity * $material->pivot->cost_unit;
+                    if (isset($notesData[$groupName]['materiales'][$materialCode])) {
+                        $lotes = &$notesData[$groupName]['materiales'][$materialCode]['lotes'];
+
+                        foreach ($lotes as &$lote) {
+                            if ($deliveredQuantity <= 0) break;
+
+                            if ($lote['cantidad'] >= $deliveredQuantity) {
+                                $lote['cantidad'] -= $deliveredQuantity;
+                                $deliveredQuantity = 0;
+                            } else {
+                                $deliveredQuantity -= $lote['cantidad'];
+                                $lote['cantidad'] = 0;
+                            }
+                        }
                     }
                 }
             }
         });
 
-        $result = array_map(function ($groupName, $data) {
-            return [
-                'grupo' => $groupName,
-                'codigo_grupo' => $data['codigo_grupo'],
-                'total_cantidad' => $data['total_cantidad'],
-                'total_presupuesto' => number_format($data['total_presupuesto'], 2)
-            ];
-        }, array_keys($groupTotals), $groupTotals);
+        $previousManagement = Management::where('id', '<', $latestManagement->id)
+            ->orderByDesc('id')
+            ->first();
 
-        return response()->json([
-            'data' => $result,
-        ]);
-    }
-
-    public function consolidated_valued_physical_inventory($idManagement)
-    {
-        $latestManagement = Management::where('id', $idManagement)->latest('id')->first();
-        $previousManagement = Management::where('id', '<', $latestManagement->id)->latest('id')->first();
-
-        $latestManagementId = $latestManagement ? $latestManagement->id : null;
-        $previousManagementId = $previousManagement ? $previousManagement->id : null;
-
-        $latestGroups = Group::whereHas('materials')
-            ->with(['materials.noteRequests' => function ($query) use ($latestManagementId) {
-                $query->where('management_id', $latestManagementId);
-            }, 'materials.noteEntries' => function ($query) use ($latestManagementId) {
-                $query->where('management_id', $latestManagementId)->where('state', 'Aceptado');
-            }])
-            ->get()
-            ->map(function ($group) {
-                $totalSum = 0;
-                $totalCost = 0;
-
-                foreach ($group->materials as $material) {
-                    $deliveredSum = $material->noteRequests->sum('pivot.delivered_quantity') ?: 0;
-                    $entrySum = $material->noteEntries->sum('pivot.amount_entries') ?: 0;
-                    $averageCost = $material->average_cost ?: 0;
-
-                    if ($entrySum > 0 && $averageCost > 0) {
-                        $totalMaterialCost = ($entrySum - $deliveredSum) * $averageCost;
-                    } else {
-                        $totalMaterialCost = 0;
-                    }
-
-                    $totalSum += ($entrySum - $deliveredSum);
-                    $totalCost += $totalMaterialCost;
-                }
-
-                return [
-                    'group_id' => $group->id,
-                    'code' => $group->code,
-                    'name_group' => $group->name_group,
-                    'latest_total_sum' => $totalSum,
-                    'latest_total_cost' => number_format($totalCost, 2)
-                ];
-            });
-
-        $previousGroups = $previousManagement
-            ? Group::whereHas('materials')
-            ->with(['materials.noteRequests' => function ($query) use ($previousManagementId) {
-                $query->where('management_id', $previousManagementId);
-            }, 'materials.noteEntries' => function ($query) use ($previousManagementId) {
-                $query->where('management_id', $previousManagementId);
-            }])
-            ->get()
-            ->map(function ($group) {
-                $totalSum = 0;
-                $totalCost = 0;
-
-                foreach ($group->materials as $material) {
-                    $deliveredSum = $material->noteRequests->sum('pivot.delivered_quantity') ?: 0;
-                    $entrySum = $material->noteEntries->sum('pivot.amount_entries') ?: 0;
-                    $averageCost = $material->average_cost ?: 0;
-
-                    if ($entrySum > 0 && $averageCost > 0) {
-                        $totalMaterialCost = ($entrySum - $deliveredSum) * $averageCost;
-                    } else {
-                        $totalMaterialCost = 0;
-                    }
-
-                    $totalSum += ($entrySum - $deliveredSum);
-                    $totalCost += $totalMaterialCost;
-                }
-
-                return [
-                    'group_id' => $group->id,
-                    'code' => $group->code,
-                    'name_group' => $group->name_group,
-                    'previous_total_sum' => $totalSum,
-                    'previous_total_cost' => number_format($totalCost, 2),
-                ];
-            })
-            : collect();
-
-
-        $latestRequests = DB::select('
-            SELECT tmp2.group_id, 
-                   SUM(tmp2.suma_entregado) AS total, 
-                   SUM(tmp2.suma_entregado * tmp.promedio) AS total_cost
-            FROM (
-                SELECT em.material_id, 
-                       AVG(em.cost_unit) AS promedio
-                FROM store.note_entries ne 
-                JOIN store.entries_material em ON ne.id = em.note_id
-                WHERE ne.management_id = ?
-                GROUP BY em.material_id
-            ) AS tmp
-            JOIN (
-                SELECT m.group_id, 
-                       m.id, 
-                       SUM(rm.delivered_quantity) AS suma_entregado
-                FROM store.note_requests nr 
-                JOIN store.request_material rm ON nr.id = rm.note_id
-                JOIN store.materials m ON rm.material_id = m.id
-                WHERE nr.management_id = ?
-                GROUP BY m.group_id, m.id
-            ) AS tmp2 ON tmp.material_id = tmp2.id
-            GROUP BY tmp2.group_id
-        ', [$latestManagementId, $latestManagementId]);
-
-        $requestMap = collect($latestRequests)->mapWithKeys(function ($item) {
-            return [$item->group_id => [
-                'latest_request_sum' => $item->total,
-                'latest_request_cost' => number_format($item->total_cost, 2)
-            ]];
-        });
-
-        $result = $latestGroups->map(function ($latestGroup) use ($requestMap, $previousGroups) {
-            $previousGroup = $previousGroups->firstWhere('group_id', $latestGroup['group_id']) ?? [
-                'previous_total_sum' => 0,
-                'previous_total_cost' => 0
-            ];
-
-            $requestData = $requestMap->get($latestGroup['group_id'], [
-                'latest_request_sum' => 0,
-                'latest_request_cost' => '0.00'
-            ]);
-
-            return array_merge($latestGroup, $previousGroup, $requestData);
-        });
-
-        return response()->json($result);
-    }
-
-
-    public function print_consolidated_valued_physical_inventory($idManagement)
-    {
-
-        $latestManagement = Management::where('id', $idManagement)->latest('id')->first();
-        $previousManagement = Management::where('id', '<', $latestManagement->id)->latest('id')->first();
-
-        $groupTotals = [];
-
-        $notesQuery = Note_Entrie::where('management_id', $latestManagement->id)
-            ->where('state', 'Aceptado')
-            ->with(['materials' => function ($query) {
-                $query->select('materials.id', 'materials.group_id');
-            }, 'materials.group' => function ($query) {
-                $query->select('groups.id', 'groups.name_group', 'groups.code');
-            }]);
-
-        $notesQuery->chunk(100, function ($notes) use (&$groupTotals) {
-            foreach ($notes as $note) {
-                foreach ($note->materials as $material) {
-                    $group = $material->group;
-                    $groupName = $group ? $group->name_group : 'Sin grupo';
-                    $groupCode = $group ? $group->code : null;
-
-                    $amountEntries = $material->pivot->amount_entries;
-                    $amountRequest = $material->pivot->request;
-                    $costUnit = $material->pivot->cost_unit;
-                    $totalCost = $amountRequest * $costUnit;
-
-                    if (!isset($groupTotals[$groupName])) {
-                        $groupTotals[$groupName] = [
-                            'codigo_grupo' => $groupCode,
-                            'total_cantidad' => 0,
-                            'total_presupuesto' => 0,
-                            'cantidad_entregada' => 0,
-                            'suma_cost_detail' => 0,
-                            'total_cantidad_anterior' => 0,
-                            'total_presupuesto_anterior' => 0
-                        ];
-                    }
-
-                    $groupTotals[$groupName]['total_cantidad'] += $amountEntries;
-                    $groupTotals[$groupName]['total_presupuesto'] += $totalCost;
-                }
-            }
-        });
+        $saldosAnteriores = [];
 
         if ($previousManagement) {
-            $previousNotesQuery = Note_Entrie::where('management_id', $previousManagement->id)
+            $saldosQuery = Note_Entrie::where('management_id', $previousManagement->id)
                 ->where('state', 'Aceptado')
                 ->with(['materials' => function ($query) {
-                    $query->select('materials.id', 'materials.group_id');
+                    $query->select('materials.id', 'materials.description', 'materials.code_material', 'materials.group_id', 'materials.unit_material');
                 }, 'materials.group' => function ($query) {
                     $query->select('groups.id', 'groups.name_group', 'groups.code');
                 }]);
 
-            $previousNotesQuery->chunk(100, function ($notes) use (&$groupTotals) {
+            $saldosQuery->chunk(100, function ($notes) use (&$saldosAnteriores) {
                 foreach ($notes as $note) {
                     foreach ($note->materials as $material) {
+                        $saldo = (float) $material->pivot->request;
+                        if ($saldo <= 0) continue;
+
                         $group = $material->group;
                         $groupName = $group ? $group->name_group : 'Sin grupo';
                         $groupCode = $group ? $group->code : null;
+                        $materialCode = $material->code_material;
+                        $materialName = $material->description;
+                        $materialUnit = $material->unit_material;
+                        $costUnit = (float) $material->pivot->cost_unit;
+                        $deliveryDate = $note->delivery_date;
 
-                        $amountRequest = $material->pivot->request;
-                        $costUnit = $material->pivot->cost_unit;
-                        $totalCost = $amountRequest * $costUnit;
-
-                        if (!isset($groupTotals[$groupName])) {
-                            $groupTotals[$groupName] = [
+                        if (!isset($saldosAnteriores[$groupName])) {
+                            $saldosAnteriores[$groupName] = [
                                 'codigo_grupo' => $groupCode,
-                                'total_cantidad' => 0,
-                                'total_presupuesto' => 0,
-                                'cantidad_entregada' => 0,
-                                'suma_cost_detail' => 0,
-                                'total_cantidad_anterior' => 0,
-                                'total_presupuesto_anterior' => 0
+                                'materiales' => []
                             ];
                         }
 
-                        $groupTotals[$groupName]['total_cantidad_anterior'] += $amountRequest;
-                        $groupTotals[$groupName]['total_presupuesto_anterior'] += $totalCost;
+                        $saldosAnteriores[$groupName]['materiales'][] = [
+                            'codigo_material' => $materialCode,
+                            'nombre_material' => $materialName,
+                            'unidad_material' => $materialUnit,
+                            'lotes' => [
+                                [
+                                    'fecha_ingreso' => $deliveryDate,
+                                    'cantidad_restante' => $saldo,
+                                    'precio_unitario' => $costUnit,
+                                    'valor_restante' => $saldo * $costUnit,
+                                ]
+                            ]
+                        ];
                     }
                 }
             });
         }
 
-        $requestsQuery = NoteRequest::where('management_id', $latestManagement->id)
-            ->with(['materials' => function ($query) {
-                $query->select('materials.id', 'materials.group_id');
-            }, 'materials.group' => function ($query) {
-                $query->select('groups.id', 'groups.name_group', 'groups.code');
-            }])
-            ->where('state', 'Aceptado');
-
-        $requestsQuery->chunk(100, function ($requests) use (&$groupTotals) {
-            foreach ($requests as $request) {
-                foreach ($request->materials as $material) {
-                    $group = $material->group;
-                    $groupName = $group ? $group->name_group : 'Sin grupo';
-                    $deliveredQuantity = $material->pivot->delivered_quantity ?? 0;
-
-                    if (!isset($groupTotals[$groupName])) {
-                        $groupTotals[$groupName] = [
-                            'codigo_grupo' => $group ? $group->code : null,
-                            'total_cantidad' => 0,
-                            'total_presupuesto' => 0,
-                            'cantidad_entregada' => 0,
-                            'suma_cost_detail' => 0,
-                            'total_cantidad_anterior' => 0,
-                            'total_presupuesto_anterior' => 0
-                        ];
-                    }
-
-                    $groupTotals[$groupName]['total_cantidad'] -= $deliveredQuantity;
-                    $groupTotals[$groupName]['total_presupuesto'] -= $deliveredQuantity * $material->pivot->cost_unit;
-                    $groupTotals[$groupName]['cantidad_entregada'] += $deliveredQuantity;
-
-                    $costDetails = $material->pivot->costDetails ?? 0;
-                    $groupTotals[$groupName]['suma_cost_detail'] += $costDetails;
+        $saldosIndexados = [];
+        foreach ($saldosAnteriores as $grupo) {
+            foreach ($grupo['materiales'] as $material) {
+                $codigo = $material['codigo_material'];
+                if (!isset($saldosIndexados[$codigo])) {
+                    $saldosIndexados[$codigo] = $material;
+                } else {
+                    $saldosIndexados[$codigo]['lotes'] = array_merge(
+                        $saldosIndexados[$codigo]['lotes'],
+                        $material['lotes']
+                    );
                 }
             }
-        });
+        }
 
-        $result = array_map(function ($groupName, $data) {
-            return [
+        $result = [];
+        foreach ($notesData as $groupName => $groupData) {
+            $groupResult = [
                 'grupo' => $groupName,
-                'codigo_grupo' => $data['codigo_grupo'],
-                'total_cantidad_anterior' => $data['total_cantidad_anterior'],
-                'total_presupuesto_anterior' => number_format($data['total_presupuesto_anterior'], 2),
-                'total_cantidad' => $data['total_cantidad'],
-                'total_presupuesto' => number_format($data['total_presupuesto'], 2),
-                'cantidad_entregada' => $data['cantidad_entregada'],
-                'suma_cost_detail' => number_format($data['suma_cost_detail'], 2)
+                'codigo_grupo' => $groupData['codigo_grupo'],
             ];
-        }, array_keys($groupTotals), $groupTotals);
+
+            $materialesTemp = [];
+
+            foreach ($groupData['materiales'] as $materialCode => $materialData) {
+                $materialLotes = array_map(function ($lote) {
+                    return [
+                        'fecha_ingreso' => $lote['fecha_ingreso'],
+                        'cantidad_inicial' => $lote['cantidad_inicial'],
+                        'cantidad_restante' => $lote['cantidad'],
+                        'precio_unitario' => $lote['precio_unitario'],
+                        'cantidad_1' => $lote['cantidad_inicial'] * $lote['precio_unitario'],
+                        'cantidad_2' => ($lote['cantidad_inicial'] - $lote['cantidad']) * $lote['precio_unitario'],
+                        'cantidad_3' => $lote['cantidad'] * $lote['precio_unitario'],
+                    ];
+                }, $materialData['lotes']);
+
+                $materialesTemp[] = [
+                    'saldo_anterior' => $saldosIndexados[$materialCode]['lotes'] ?? [],
+                    'lotes' => $materialLotes
+                ];
+            }
+
+            $saldoAnteriorCantidad = 0;
+            $saldoAnteriorTotal = 0;
+            $entradasCantidad = 0;
+            $entradasTotal = 0;
+            $salidasCantidad = 0;
+            $salidasTotal = 0;
+            $saldoFinalCantidad = 0;
+            $saldoFinalTotal = 0;
+
+            foreach ($materialesTemp as $material) {
+                foreach ($material['saldo_anterior'] as $lote) {
+                    $saldoAnteriorCantidad += $lote['cantidad_restante'] ?? 0;
+                    $saldoAnteriorTotal += $lote['valor_restante'] ?? 0;
+                }
+                foreach ($material['lotes'] as $lote) {
+                    $entradasCantidad += $lote['cantidad_inicial'] ?? 0;
+                    $entradasTotal += $lote['cantidad_1'] ?? 0;
+                    $salidasCantidad += ($lote['cantidad_inicial'] - $lote['cantidad_restante']) ?? 0;
+                    $salidasTotal += $lote['cantidad_2'] ?? 0;
+                    $saldoFinalCantidad += $lote['cantidad_restante'] ?? 0;
+                    $saldoFinalTotal += $lote['cantidad_3'] ?? 0;
+                }
+            }
+
+            $groupResult['resumen'] = [
+                'saldo_anterior_cantidad' => $saldoAnteriorCantidad,
+                'saldo_anterior_total' => $saldoAnteriorTotal,
+                'entradas_cantidad' => $entradasCantidad,
+                'entradas_total' => $entradasTotal,
+                'salidas_cantidad' => $salidasCantidad,
+                'salidas_total' => $salidasTotal,
+                'saldo_final_cantidad' => $saldoFinalCantidad,
+                'saldo_final_total' => $saldoFinalTotal,
+            ];
+
+            $result[] = $groupResult;
+        }
+
+        $note = Note_Entrie::getFirstNoteOfYear();
 
 
         $data = [
             'title' => 'INVENTARIO FISICO VALORADO CONSOLIDADO',
-            'results' => $result
+            'results' => $result,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
         ];
 
 
@@ -1180,236 +1541,259 @@ class ReportController extends Controller
         return ($management);
     }
 
-
-    public function consolidated_inventory($idManagement)
+    public function consolidated_inventory($request)
     {
-        $latestManagement = Management::where('id', $idManagement)->latest('id')->first();
-        $previousManagement = Management::where('id', '<', $latestManagement->id)->latest('id')->first();
+        $requestTotal = $this->ValuedPhysical($request);
+        return $requestTotal;
+    }
 
-        $groupTotals = [];
+
+    public function consolidated_inventory_modificaded(Request $request)
+    {
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
+        $latestManagement = Management::latest('id')->first();
 
         $notesQuery = Note_Entrie::where('management_id', $latestManagement->id)
             ->where('state', 'Aceptado')
             ->with(['materials' => function ($query) {
-                $query->select('materials.id', 'materials.group_id');
+                $query->select('materials.id', 'materials.description', 'materials.code_material', 'materials.group_id', 'materials.unit_material');
             }, 'materials.group' => function ($query) {
                 $query->select('groups.id', 'groups.name_group', 'groups.code');
             }]);
 
-        $notesQuery->chunk(100, function ($notes) use (&$groupTotals) {
+        if ($startDate && $endDate) {
+            $notesQuery->whereBetween('delivery_date', [$startDate, $endDate]);
+        }
+
+        $notesData = [];
+        $notesQuery->chunk(100, function ($notes) use (&$notesData) {
             foreach ($notes as $note) {
                 foreach ($note->materials as $material) {
                     $group = $material->group;
                     $groupName = $group ? $group->name_group : 'Sin grupo';
                     $groupCode = $group ? $group->code : null;
 
-                    $amountEntries = $material->pivot->amount_entries;
-                    $amountRequest = $material->pivot->request;
-                    $costUnit = $material->pivot->cost_unit;
-                    $totalCost = $amountRequest * $costUnit;
+                    $materialCode = $material->code_material;
+                    $materialName = $material->description;
+                    $materialUnit = $material->unit_material;
+                    $amountEntries = (float) $material->pivot->amount_entries;
+                    $costUnit = (float) $material->pivot->cost_unit;
+                    $deliveryDate = $note->delivery_date;
 
-                    if (!isset($groupTotals[$groupName])) {
-                        $groupTotals[$groupName] = [
+                    if (!isset($notesData[$groupName])) {
+                        $notesData[$groupName] = [
                             'codigo_grupo' => $groupCode,
-                            'total_cantidad' => 0,
-                            'total_presupuesto' => 0,
-                            'cantidad_entregada' => 0,
-                            'suma_cost_detail' => 0,
-                            'total_cantidad_anterior' => 0,
-                            'total_presupuesto_anterior' => 0
+                            'materiales' => []
                         ];
                     }
 
-                    $groupTotals[$groupName]['total_cantidad'] += $amountEntries;
-                    $groupTotals[$groupName]['total_presupuesto'] += $totalCost;
+                    if (!isset($notesData[$groupName]['materiales'][$materialCode])) {
+                        $notesData[$groupName]['materiales'][$materialCode] = [
+                            'codigo_material' => $materialCode,
+                            'nombre_material' => $materialName,
+                            'unidad_material' => $materialUnit,
+                            'lotes' => []
+                        ];
+                    }
+
+                    $notesData[$groupName]['materiales'][$materialCode]['lotes'][] = [
+                        'fecha_ingreso' => $deliveryDate,
+                        'cantidad_inicial' => $amountEntries,
+                        'cantidad' => $amountEntries,
+                        'precio_unitario' => $costUnit
+                    ];
                 }
             }
         });
 
+        $requestsQuery = NoteRequest::where('management_id', $latestManagement->id)
+            ->with(['materials' => function ($query) {
+                $query->select('materials.id', 'materials.code_material', 'materials.group_id');
+            }, 'materials.group' => function ($query) {
+                $query->select('groups.id', 'groups.name_group', 'groups.code');
+            }])->where('state', 'Aceptado');
+
+        if ($startDate && $endDate) {
+            $requestsQuery->whereBetween('received_on_date', [$startDate, $endDate]);
+        }
+
+        $requestsQuery->chunk(100, function ($requests) use (&$notesData) {
+            foreach ($requests as $request) {
+                foreach ($request->materials as $material) {
+                    $group = $material->group;
+                    $groupName = $group ? $group->name_group : 'Sin grupo';
+                    $materialCode = $material->code_material;
+                    $deliveredQuantity = (float) $material->pivot->delivered_quantity;
+
+                    if (isset($notesData[$groupName]['materiales'][$materialCode])) {
+                        $lotes = &$notesData[$groupName]['materiales'][$materialCode]['lotes'];
+
+                        foreach ($lotes as &$lote) {
+                            if ($deliveredQuantity <= 0) break;
+
+                            if ($lote['cantidad'] >= $deliveredQuantity) {
+                                $lote['cantidad'] -= $deliveredQuantity;
+                                $deliveredQuantity = 0;
+                            } else {
+                                $deliveredQuantity -= $lote['cantidad'];
+                                $lote['cantidad'] = 0;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        $previousManagement = Management::where('id', '<', $latestManagement->id)
+            ->orderByDesc('id')
+            ->first();
+
+        $saldosAnteriores = [];
+
         if ($previousManagement) {
-            $previousNotesQuery = Note_Entrie::where('management_id', $previousManagement->id)
+            $saldosQuery = Note_Entrie::where('management_id', $previousManagement->id)
                 ->where('state', 'Aceptado')
                 ->with(['materials' => function ($query) {
-                    $query->select('materials.id', 'materials.group_id');
+                    $query->select('materials.id', 'materials.description', 'materials.code_material', 'materials.group_id', 'materials.unit_material');
                 }, 'materials.group' => function ($query) {
                     $query->select('groups.id', 'groups.name_group', 'groups.code');
                 }]);
 
-            $previousNotesQuery->chunk(100, function ($notes) use (&$groupTotals) {
+            $saldosQuery->chunk(100, function ($notes) use (&$saldosAnteriores) {
                 foreach ($notes as $note) {
                     foreach ($note->materials as $material) {
+                        $saldo = (float) $material->pivot->request;
+                        if ($saldo <= 0) continue;
+
                         $group = $material->group;
                         $groupName = $group ? $group->name_group : 'Sin grupo';
                         $groupCode = $group ? $group->code : null;
+                        $materialCode = $material->code_material;
+                        $materialName = $material->description;
+                        $materialUnit = $material->unit_material;
+                        $costUnit = (float) $material->pivot->cost_unit;
+                        $deliveryDate = $note->delivery_date;
 
-                        $amountRequest = $material->pivot->request;
-                        $costUnit = $material->pivot->cost_unit;
-                        $totalCost = $amountRequest * $costUnit;
-
-                        if (!isset($groupTotals[$groupName])) {
-                            $groupTotals[$groupName] = [
+                        if (!isset($saldosAnteriores[$groupName])) {
+                            $saldosAnteriores[$groupName] = [
                                 'codigo_grupo' => $groupCode,
-                                'total_cantidad' => 0,
-                                'total_presupuesto' => 0,
-                                'cantidad_entregada' => 0,
-                                'suma_cost_detail' => 0,
-                                'total_cantidad_anterior' => 0,
-                                'total_presupuesto_anterior' => 0
+                                'materiales' => []
                             ];
                         }
 
-                        $groupTotals[$groupName]['total_cantidad_anterior'] += $amountRequest;
-                        $groupTotals[$groupName]['total_presupuesto_anterior'] += $totalCost;
+                        $saldosAnteriores[$groupName]['materiales'][] = [
+                            'codigo_material' => $materialCode,
+                            'nombre_material' => $materialName,
+                            'unidad_material' => $materialUnit,
+                            'lotes' => [
+                                [
+                                    'fecha_ingreso' => $deliveryDate,
+                                    'cantidad_restante' => $saldo,
+                                    'precio_unitario' => $costUnit,
+                                    'valor_restante' => $saldo * $costUnit,
+                                ]
+                            ]
+                        ];
                     }
                 }
             });
         }
 
-        $requestsQuery = NoteRequest::where('management_id', $latestManagement->id)
-            ->with(['materials' => function ($query) {
-                $query->select('materials.id', 'materials.group_id');
-            }, 'materials.group' => function ($query) {
-                $query->select('groups.id', 'groups.name_group', 'groups.code');
-            }])
-            ->where('state', 'Aceptado');
-
-        $requestsQuery->chunk(100, function ($requests) use (&$groupTotals) {
-            foreach ($requests as $request) {
-                foreach ($request->materials as $material) {
-                    $group = $material->group;
-                    $groupName = $group ? $group->name_group : 'Sin grupo';
-                    $deliveredQuantity = $material->pivot->delivered_quantity ?? 0;
-
-                    if (!isset($groupTotals[$groupName])) {
-                        $groupTotals[$groupName] = [
-                            'codigo_grupo' => $group ? $group->code : null,
-                            'total_cantidad' => 0,
-                            'total_presupuesto' => 0,
-                            'cantidad_entregada' => 0,
-                            'suma_cost_detail' => 0,
-                            'total_cantidad_anterior' => 0,
-                            'total_presupuesto_anterior' => 0
-                        ];
-                    }
-
-                    $groupTotals[$groupName]['total_cantidad'] -= $deliveredQuantity;
-                    $groupTotals[$groupName]['total_presupuesto'] -= $deliveredQuantity * $material->pivot->cost_unit;
-                    $groupTotals[$groupName]['cantidad_entregada'] += $deliveredQuantity;
-
-                    $costDetails = $material->pivot->costDetails ?? 0;
-                    $groupTotals[$groupName]['suma_cost_detail'] += $costDetails;
+        $saldosIndexados = [];
+        foreach ($saldosAnteriores as $grupo) {
+            foreach ($grupo['materiales'] as $material) {
+                $codigo = $material['codigo_material'];
+                if (!isset($saldosIndexados[$codigo])) {
+                    $saldosIndexados[$codigo] = $material;
+                } else {
+                    $saldosIndexados[$codigo]['lotes'] = array_merge(
+                        $saldosIndexados[$codigo]['lotes'],
+                        $material['lotes']
+                    );
                 }
             }
-        });
+        }
 
-        $result = array_map(function ($groupName, $data) {
-            return [
+        $result = [];
+        foreach ($notesData as $groupName => $groupData) {
+            $groupResult = [
                 'grupo' => $groupName,
-                'codigo_grupo' => $data['codigo_grupo'],
-                'total_cantidad_anterior' => $data['total_cantidad_anterior'],
-                'total_presupuesto_anterior' => number_format($data['total_presupuesto_anterior'], 2),
-                'total_cantidad' => $data['total_cantidad'],
-                'total_presupuesto' => number_format($data['total_presupuesto'], 2),
-                'cantidad_entregada' => $data['cantidad_entregada'],
-                'suma_cost_detail' => number_format($data['suma_cost_detail'], 2)
+                'codigo_grupo' => $groupData['codigo_grupo'],
             ];
-        }, array_keys($groupTotals), $groupTotals);
 
-        return $result;
+            $materialesTemp = [];
+
+            foreach ($groupData['materiales'] as $materialCode => $materialData) {
+                $materialLotes = array_map(function ($lote) {
+                    return [
+                        'fecha_ingreso' => $lote['fecha_ingreso'],
+                        'cantidad_inicial' => $lote['cantidad_inicial'],
+                        'cantidad_restante' => $lote['cantidad'],
+                        'precio_unitario' => $lote['precio_unitario'],
+                        'cantidad_1' => $lote['cantidad_inicial'] * $lote['precio_unitario'],
+                        'cantidad_2' => ($lote['cantidad_inicial'] - $lote['cantidad']) * $lote['precio_unitario'],
+                        'cantidad_3' => $lote['cantidad'] * $lote['precio_unitario'],
+                    ];
+                }, $materialData['lotes']);
+
+                $materialesTemp[] = [
+                    'saldo_anterior' => $saldosIndexados[$materialCode]['lotes'] ?? [],
+                    'lotes' => $materialLotes
+                ];
+            }
+
+            $saldoAnteriorCantidad = 0;
+            $saldoAnteriorTotal = 0;
+            $entradasCantidad = 0;
+            $entradasTotal = 0;
+            $salidasCantidad = 0;
+            $salidasTotal = 0;
+            $saldoFinalCantidad = 0;
+            $saldoFinalTotal = 0;
+
+            foreach ($materialesTemp as $material) {
+                foreach ($material['saldo_anterior'] as $lote) {
+                    $saldoAnteriorCantidad += $lote['cantidad_restante'] ?? 0;
+                    $saldoAnteriorTotal += $lote['valor_restante'] ?? 0;
+                }
+                foreach ($material['lotes'] as $lote) {
+                    $entradasCantidad += $lote['cantidad_inicial'] ?? 0;
+                    $entradasTotal += $lote['cantidad_1'] ?? 0;
+                    $salidasCantidad += ($lote['cantidad_inicial'] - $lote['cantidad_restante']) ?? 0;
+                    $salidasTotal += $lote['cantidad_2'] ?? 0;
+                    $saldoFinalCantidad += $lote['cantidad_restante'] ?? 0;
+                    $saldoFinalTotal += $lote['cantidad_3'] ?? 0;
+                }
+            }
+
+            $groupResult['resumen'] = [
+                'saldo_anterior_cantidad' => $saldoAnteriorCantidad,
+                'saldo_anterior_total' => $saldoAnteriorTotal,
+                'entradas_cantidad' => $entradasCantidad,
+                'entradas_total' => $entradasTotal,
+                'salidas_cantidad' => $salidasCantidad,
+                'salidas_total' => $salidasTotal,
+                'saldo_final_cantidad' => $saldoFinalCantidad,
+                'saldo_final_total' => $saldoFinalTotal,
+            ];
+
+            $result[] = $groupResult;
+        }
+
+        $note = Note_Entrie::getFirstNoteOfYear();
+        // $formattedDate = $note ? Note_Entrie::formatDate($note->delivery_date) : null;
+
+        return response()->json([
+            'data' => $result
+        ]);
     }
 
+    public function consolidated_inventory_excel(Request $request)
+    {
+        $jsonData = $this->consolidated_inventory_modificaded($request)->getData(true);
 
-
-
-    // public function consolidated_inventory($idManagement)
-    // {
-    //     $latestManagement = Management::where('id', $idManagement)->latest('id')->first();
-    //     $previousManagement = Management::where('id', '<', $latestManagement->id)->latest('id')->first();
-
-
-    //     $notesQuery = Note_Entrie::where('management_id', $latestManagement->id)
-    //         ->where('state', 'Aceptado')
-    //         ->with(['materials' => function ($query) {
-    //             $query->select('materials.id', 'materials.group_id');
-    //         }, 'materials.group' => function ($query) {
-    //             $query->select('groups.id', 'groups.name_group', 'groups.code');
-    //         }]);
-
-    //     $groupTotals = [];
-
-    //     $notesQuery->chunk(100, function ($notes) use (&$groupTotals) {
-    //         foreach ($notes as $note) {
-    //             foreach ($note->materials as $material) {
-    //                 $group = $material->group;
-    //                 $groupName = $group ? $group->name_group : 'Sin grupo';
-    //                 $groupCode = $group ? $group->code : null;
-
-    //                 $amountEntries = $material->pivot->amount_entries;
-    //                 $amountRequest = $material->pivot->request;
-    //                 $costUnit = $material->pivot->cost_unit;
-    //                 $totalCost = $amountRequest * $costUnit;
-
-    //                 if (!isset($groupTotals[$groupName])) {
-    //                     $groupTotals[$groupName] = [
-    //                         'codigo_grupo' => $groupCode,
-    //                         'total_cantidad' => 0,
-    //                         'total_presupuesto' => 0,
-    //                         'cantidad_entregada' => 0,
-    //                         'suma_cost_detail' => 0
-    //                     ];
-    //                 }
-
-    //                 $groupTotals[$groupName]['total_cantidad'] += $amountEntries;
-    //                 $groupTotals[$groupName]['total_presupuesto'] += $totalCost;
-    //             }
-    //         }
-    //     });
-
-    //     $requestsQuery = NoteRequest::where('management_id', $latestManagement->id)
-    //         ->with(['materials' => function ($query) {
-    //             $query->select('materials.id', 'materials.group_id');
-    //         }, 'materials.group' => function ($query) {
-    //             $query->select('groups.id', 'groups.name_group', 'groups.code');
-    //         }])
-    //         ->where('state', 'Aceptado');
-
-    //     $requestsQuery->chunk(100, function ($requests) use (&$groupTotals) {
-    //         foreach ($requests as $request) {
-    //             foreach ($request->materials as $material) {
-    //                 $group = $material->group;
-    //                 $groupName = $group ? $group->name_group : 'Sin grupo';
-    //                 $deliveredQuantity = $material->pivot->delivered_quantity ?? 0;
-
-    //                 if (!isset($groupTotals[$groupName])) {
-    //                     $groupTotals[$groupName] = [
-    //                         'codigo_grupo' => $group ? $group->code : null,
-    //                         'total_cantidad' => 0,
-    //                         'total_presupuesto' => 0,
-    //                         'cantidad_entregada' => 0,
-    //                         'suma_cost_detail' => 0
-    //                     ];
-    //                 }
-
-    //                 $groupTotals[$groupName]['total_cantidad'] -= $deliveredQuantity;
-    //                 $groupTotals[$groupName]['total_presupuesto'] -= $deliveredQuantity * $material->pivot->cost_unit;
-    //                 $groupTotals[$groupName]['cantidad_entregada'] += $deliveredQuantity;
-    //                 $costDetails = $material->pivot->costDetails ?? 0;
-    //                 $groupTotals[$groupName]['suma_cost_detail'] += $costDetails;
-    //             }
-    //         }
-    //     });
-
-    //     $result = array_map(function ($groupName, $data) {
-    //         return [
-    //             'grupo' => $groupName,
-    //             'codigo_grupo' => $data['codigo_grupo'],
-    //             'total_cantidad' => $data['total_cantidad'],
-    //             'total_presupuesto' => number_format($data['total_presupuesto'], 2),
-    //             'cantidad_entregada' => $data['cantidad_entregada'],
-    //             'suma_cost_detail' => number_format($data['suma_cost_detail'], 2)
-    //         ];
-    //     }, array_keys($groupTotals), $groupTotals);
-
-    //     return $result;
-    // }
+        return Excel::download(new ConsolidatedValuedPhysicalInventoryExport($jsonData['data']), 'inventario_valorado.xlsx');
+    }
 }

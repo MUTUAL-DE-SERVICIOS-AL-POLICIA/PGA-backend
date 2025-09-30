@@ -150,7 +150,6 @@ $dns = new DNS2D();
                         <td class="text-right">{{ number_format($material['cost_unit'] * $material['amount_request'], 2) }}</td>
                     </tr>
                     @endforeach
-
                     @for($i = sizeof($materials) + 1; $i <= $max_requests; $i++)
                         <tr>
                         <td class="text-center" colspan="6">&nbsp;</td>

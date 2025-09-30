@@ -49,14 +49,12 @@ class MaterialController extends Controller
                 'type' => 'required|string',
             ]);
 
-            // Buscamos el grupo especificado
             $group = Group::find($data['group_id']);
 
             if (!$group) {
                 return response()->json(['error' => 'Group not found'], 404);
             }
 
-            // Determinamos un nuevo code_material único
             $newCorrelativo = 1;
             do {
                 $newCodeMaterial = $group->code . $newCorrelativo;
@@ -64,10 +62,8 @@ class MaterialController extends Controller
                 $newCorrelativo++;
             } while ($exists);
 
-            // Formateamos la descripción en mayúsculas
             $data['description'] = strtoupper($data['description']);
 
-            // Creamos el nuevo material
             $material = Material::create([
                 'group_id' => $data['group_id'],
                 'code_material' => $newCodeMaterial,
@@ -90,8 +86,6 @@ class MaterialController extends Controller
             ], 500);
         }
     }
-
-
 
     /**
      * Display the specified resource.
@@ -116,7 +110,6 @@ class MaterialController extends Controller
                 'cost_total' => $entry->pivot->cost_total,
             ];
         });
-
 
         return response()->json([
             'material_id' => $material->id,
@@ -244,7 +237,7 @@ class MaterialController extends Controller
                 foreach ($materials as $material) {
                     $group = $material->group;
 
-                    if (!$group) continue; 
+                    if (!$group) continue;
 
                     $newCorrelativo = 1;
                     do {
@@ -276,15 +269,16 @@ class MaterialController extends Controller
         }
     }
 
-    public function NameMaterialCorrect(){        
+    public function NameMaterialCorrect()
+    {
         $notes = Entrie_Material::where('material_id', 49)->get();
-        
+
         foreach ($notes as $note) {
-            if($note->name_material === '34600 - MINERALES (CAJA CHICA)'){
+            if ($note->name_material === '34600 - MINERALES (CAJA CHICA)') {
                 $note->name_material = '34700 - MINERALES (CAJA CHICA)';
                 $note->save();
             }
         }
         return $notes;
-    }   
+    }
 }

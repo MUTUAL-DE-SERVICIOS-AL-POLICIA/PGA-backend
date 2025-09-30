@@ -27,9 +27,18 @@ class Note_Entrie extends Model
         return $this->belongsTo(Supplier::class, 'suppliers_id');
     }
 
+    public function suppliers()
+    {
+        return $this->belongsToMany(Supplier::class, 'note_entrie_supplier', 'note_entrie_id', 'supplier_id')
+            ->withPivot('invoice_number')
+            ->withTimestamps();
+    }
+
+
+
     public function materials()
     {
-        return $this->belongsToMany(Material::class, 'entries_material', 'note_id', 'material_id')->withPivot('amount_entries', 'cost_unit', 'cost_total', 'name_material', 'request','delivery_date_entry')->withTimestamps();
+        return $this->belongsToMany(Material::class, 'entries_material', 'note_id', 'material_id')->withPivot('amount_entries', 'cost_unit', 'cost_total', 'name_material', 'request', 'delivery_date_entry')->withTimestamps();
     }
 
     public static function getFirstNoteOfYear()

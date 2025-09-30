@@ -23,7 +23,7 @@ class LogHttpRequests
             'method' => $request->method(),
             'url' => $request->fullUrl(),
             'ip' => $request->ip(),
-            'status' => $response->status(),
+            'status' => $response->getStatusCode(),  
             'user_agent' => $request->header('User-Agent'),
         ]);
 

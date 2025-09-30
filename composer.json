@@ -13,6 +13,7 @@
         "laravel/framework": "^11.0",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.9",
+        "maatwebsite/excel": "^3.1",
         "milon/barcode": "^11.0",
         "santigarcor/laratrust": "^8.3",
         "tymon/jwt-auth": "^2.1"
