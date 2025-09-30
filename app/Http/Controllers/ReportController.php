@@ -493,6 +493,9 @@ class ReportController extends Controller
                 'importe_saldo' => round($totalImporteSaldo, 2),
             ];
 
+            $firstDay = date("Y-01-01");
+
+            $lastDayPrevYear = date("Y-m-d", strtotime("{$firstDay} -1 day"));
             $data = [
                 'title' => 'KARDEX DE EXISTENCIAS',
                 'code_material' => $material->code_material,
@@ -503,6 +506,8 @@ class ReportController extends Controller
                 'totales' => $totales,
                 'start_date' => $startDate,
                 'end_date' => $dateof,
+                'firtsDay'=> $firstDay,
+                'lastDay'=> $lastDayPrevYear,
                 'balance_amount_entries' => $amountEntriesTotal,
                 'balance_cost_total' => $costTotalTotal
             ];

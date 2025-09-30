@@ -164,7 +164,6 @@ class ProductController extends Controller
 
     public function print_Petty_Cash(PettyCash $notepettyCash)
     {
-        logger($notepettyCash);
         $positionName = $this->titlePerson($notepettyCash->user_register);
         $user = User::where('employee_id', $notepettyCash->user_register)->first();
         if ($user) {
@@ -198,7 +197,6 @@ class ProductController extends Controller
         } else {
             $employee = Employee::where('id', $notepettyCash->user_register)->first();
             if ($employee) {
-                logger($positionName);
                 $employee = Employee::find($notepettyCash->user_register);
                 $products = $notepettyCash->products()->get()->map(function ($product) {
                     return [

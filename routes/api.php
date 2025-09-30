@@ -61,7 +61,7 @@ Route::group([
         Route::resource('suppliers', SupplierController::class);
         Route::resource('materials', MaterialController::class);
 
-        Route::get('materials_add', [MaterialController::class, 'create_material_sub_group']);
+
 
         Route::get('fixMaterialDuplicate', [MaterialController::class, 'fixDuplicatedCodes']);
         Route::patch('/updateName/{material}/', [MaterialController::class, 'updateName']);
