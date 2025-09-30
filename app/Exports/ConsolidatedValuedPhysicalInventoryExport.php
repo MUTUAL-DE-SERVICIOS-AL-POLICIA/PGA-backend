@@ -11,18 +11,15 @@ class ConsolidatedValuedPhysicalInventoryExport implements FromCollection, WithH
 {
     protected $results;
 
-    // Recibimos los datos ya procesados (resultados del controlador)
     public function __construct($results)
     {
         $this->results = $results;
     }
 
-    // Recibimos los resúmenes y los preparamos para la exportación
     public function collection()
     {
         $data = [];
 
-        // Iteramos sobre cada grupo y formateamos los resúmenes
         foreach ($this->results as $group) {
             $data[] = [
                 'grupo' => $group['grupo'],
@@ -41,7 +38,6 @@ class ConsolidatedValuedPhysicalInventoryExport implements FromCollection, WithH
         return collect($data);
     }
 
-    // Encabezados para las columnas de Excel
     public function headings(): array
     {
         return [
@@ -58,7 +54,6 @@ class ConsolidatedValuedPhysicalInventoryExport implements FromCollection, WithH
         ];
     }
 
-    // Formatos para las columnas numéricas
     public function columnFormats(): array
     {
         return [
