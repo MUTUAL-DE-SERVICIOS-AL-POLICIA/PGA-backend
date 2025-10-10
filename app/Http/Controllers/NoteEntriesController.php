@@ -24,8 +24,6 @@ class NoteEntriesController extends Controller
         $page = max(0, $request->get('page', 0));
         $limit = max(1, $request->get('limit', Note_Entrie::count()));
         $search = $request->get('search', '');
-
-        // Pagina con el método paginate()
         $startDate = $request->input('start_date', '');
         $endDate = $request->input('end_date', '');
 

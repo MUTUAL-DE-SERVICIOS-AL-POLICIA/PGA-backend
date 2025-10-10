@@ -38,7 +38,6 @@ class KardexExport implements FromArray, WithHeadings, WithTitle
             ];
         }
 
-        // Add totals as the last row
         $kardexData[] = [
             'Date' => 'Totales',
             'Description' => '',

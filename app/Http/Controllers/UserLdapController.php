@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\Ldap;
 use App\Models\Employee;
 use App\Models\Management;
 use App\Models\NoteRequest;
@@ -90,35 +91,11 @@ class UserLdapController extends Controller
         $noteRequests = $query->get();
 
         $employee = $noteRequests->first() ? $noteRequests->first()->employee : null;
+        
         $materialsGrouped = [];
 
-        if ($employee) {
-            $id = $employee->id;
-            $cargo = DB::table('public.contracts as c')
-                ->join('public.positions as p', 'c.position_id', '=', 'p.id')
-                ->join('public.employees as e', 'c.employee_id', '=', 'e.id')
-                ->join('public.position_groups as pg', 'p.position_group_id', '=', 'pg.id')
-                ->select('c.employee_id', 'e.first_name', 'e.last_name', 'e.mothers_last_name', 'p.name as position_name', 'pg.name as group_name', 'pg.id as group_id')
-                ->where('c.active', true)
-                ->whereNull('c.deleted_at')
-                ->whereIn('pg.id', [7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
-                ->where('c.employee_id', $id)
-                ->unionAll(
-                    DB::table('public.consultant_contracts as cc')
-                        ->join('public.consultant_positions as cp', 'cc.consultant_position_id', '=', 'cp.id')
-                        ->join('public.employees as e', 'cc.employee_id', '=', 'e.id')
-                        ->join('public.position_groups as pg', 'cp.position_group_id', '=', 'pg.id')
-                        ->select('cc.employee_id', 'e.first_name', 'e.last_name', 'e.mothers_last_name', 'cp.name as position_name', 'pg.name as group_name', 'pg.id as group_id')
-                        ->where('cc.active', true)
-                        ->whereNull('cc.deleted_at')
-                        ->whereIn('pg.id', [7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
-                        ->where('cc.employee_id', $id)
-                )
-                ->get();
-            $positionName = isset($cargo[0]) ? $cargo[0]->position_name : null;
-        } else {
-            $positionName = null;
-        }
+        $positionName = $this->titlePerson($employee->id);
+        
 
         foreach ($noteRequests as $noteRequest) {
             foreach ($noteRequest->materials as $material) {
@@ -170,34 +147,7 @@ class UserLdapController extends Controller
         $materialsGrouped = [];
 
 
-        if ($employee) {
-            $id = $employee->id;
-            $cargo = DB::table('public.contracts as c')
-                ->join('public.positions as p', 'c.position_id', '=', 'p.id')
-                ->join('public.employees as e', 'c.employee_id', '=', 'e.id')
-                ->join('public.position_groups as pg', 'p.position_group_id', '=', 'pg.id')
-                ->select('c.employee_id', 'e.first_name', 'e.last_name', 'e.mothers_last_name', 'p.name as position_name', 'pg.name as group_name', 'pg.id as group_id')
-                ->where('c.active', true)
-                ->whereNull('c.deleted_at')
-                ->whereIn('pg.id', [7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
-                ->where('c.employee_id', $id)
-                ->unionAll(
-                    DB::table('public.consultant_contracts as cc')
-                        ->join('public.consultant_positions as cp', 'cc.consultant_position_id', '=', 'cp.id')
-                        ->join('public.employees as e', 'cc.employee_id', '=', 'e.id')
-                        ->join('public.position_groups as pg', 'cp.position_group_id', '=', 'pg.id')
-                        ->select('cc.employee_id', 'e.first_name', 'e.last_name', 'e.mothers_last_name', 'cp.name as position_name', 'pg.name as group_name', 'pg.id as group_id')
-                        ->where('cc.active', true)
-                        ->whereNull('cc.deleted_at')
-                        ->whereIn('pg.id', [7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
-                        ->where('cc.employee_id', $id)
-                )
-                ->get();
-
-            $positionName = isset($cargo[0]) ? $cargo[0]->position_name : null;
-        } else {
-            $positionName = null;
-        }
+        $positionName = $this->titlePerson($employee->id);
 
         foreach ($noteRequests as $noteRequest) {
             foreach ($noteRequest->materials as $material) {
@@ -456,5 +406,18 @@ class UserLdapController extends Controller
 
         $pdf = Pdf::loadView('Request_Directory.RequestDirectory', $data);
         return $pdf->download('Salidas_por_Direccion.pdf');
+    }
+
+
+    public function titlePerson($idPersona)
+    {
+        $ldap = new Ldap();
+        $user = $ldap->get_entry($idPersona, 'id');
+
+        if ($user && isset($user['title'])) {
+            return $user['title'];
+        }
+
+        return null;
     }
 }

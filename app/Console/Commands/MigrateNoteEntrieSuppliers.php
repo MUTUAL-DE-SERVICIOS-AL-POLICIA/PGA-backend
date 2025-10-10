@@ -26,7 +26,7 @@ class MigrateNoteEntrieSuppliers extends Command
             DB::table('note_entrie_supplier')->insert([
                 'note_entrie_id' => $note->id,
                 'supplier_id' => $note->suppliers_id,
-                'invoice_number' => $note->invoice_number, // <- si ya lo tenés en la tabla original
+                'invoice_number' => $note->invoice_number,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
