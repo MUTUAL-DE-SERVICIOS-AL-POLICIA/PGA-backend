@@ -86,7 +86,8 @@ $dns = new DNS2D();
 </head>
 
 <body style="border: 0; border-radius: 0;">
-    <table class="w-100 uppercase" style="margin-top: 50px;">
+    @for($it = 0; $it<2; $it++)
+        <table class="w-100 uppercase" style="margin-top: 20px;">
         <tr>
             <th class="w-25 text-left no-paddings no-margins align-middle">
                 <div class="text-left">
@@ -95,9 +96,8 @@ $dns = new DNS2D();
             </th>
             <th class="w-50 align-top">
                 <div class="font-hairline leading-tight text-xs">
-                    <div>MUTUAL DE SERVICIOS AL POLICÍA "MUSERPOL"</div>
-                    <div>DIRECCIÓN DE ASUNTOS ADMINISTRATIVOS</div>
-                    <div>UNIDAD ADMINISTRATIVA</div>
+                    <div>FORMULARIO N° 4</div>
+                    <div>{{$title}}</div>
                 </div>
             </th>
             <th class="w-25 no-padding no-margins align-top">
@@ -115,92 +115,80 @@ $dns = new DNS2D();
                 </table>
             </th>
         </tr>
-    </table>
-    <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
-    <div class="block">
-        <div class="leading-tight text-sm text-center m-b-10">FORMULARIO N° 2</div>
-        <div class="leading-tight text-sm text-center m-b-10">{{ $title }}{{ $subtitle }}</div>
-    </div>
-    <div class="leading-tight text-sm text-left m-b-10">
-        <strong>POR CONCEPTO:</strong>
-    </div>
-    <div class="leading-tight text-sm text-left m-b-10">
-        {{$concept}}
-    </div>
-    <div class="leading-tight text-sm text-left m-b-10">
+        </table>
+        <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
 
-    </div>
-    <div class="leading-tight text-sm text-left m-b-10">
-        <strong>SOLICITADO:</strong>
-    </div>
-    <table class="table-info w-100 m-b-10 uppercase text-xs">
-        <thead>
-            <tr>
-                <th class="text-center bg-grey-darker text-white">ITEM</th>
-                <th class="text-center bg-grey-darker text-white border-left-white">PROVEEDOR</th>
-                <th class="text-center bg-grey-darker text-white border-left-white">FECHA</th>
-                <th class="text-center bg-grey-darker text-white border-left-white">N° DE FACTURA</th>
-                <th class="text-center bg-grey-darker text-white border-left-white">PARTIDA PRESUPUESTARIA</th>
-                <th class="text-center bg-grey-darker text-white border-left-white">CANTIDAD</th>
-                <th class="text-center bg-grey-darker text-white border-left-white">PRECIO UNIT</th>
-                <th class="text-center bg-grey-darker text-white border-left-white">TOTAL (BS)</th>
-            </tr>
-        </thead>
-        <tbody class="table-striped">
-            @foreach ($products as $i => $product)
-            <tr>
-                <td class="text-center">{{ ++$i }}</td>
-                <td class="text-center">{{ $product['supplier'] }}</td>
-                <td class="text-center">{{ $request_date }}</td>
-                <td class="text-center">{{ $product['number_invoice'] }}</td>
-                <td class="text-center">{{ $product['code_group'] }}</td>
-                <td class="text-center">{{ $product['quantity'] }}</td>
-                <td class="text-center">{{ $product['price'] }}</td>
-                <td class="text-right">{{ number_format($product['total'], 2)}}</td>
-            </tr>
-            @endforeach
-            @for($i = sizeof($products) + 1; $i <= $max_requests; $i++)
+        <div class="leading-tight text-sm text-left m-b-10">
+            <strong>POR CONCEPTO:</strong> {{$concept}}
+        </div>
+        <table class="table-info w-100 m-b-10 uppercase text-xs">
+            <thead>
                 <tr>
-                <td class="text-center" colspan="8">&nbsp;</td>
+                    <th class="text-center bg-grey-darker text-white">ITEM</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">PROVEEDOR</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">FECHA</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">N° DE FACTURA</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">PARTIDA PRESUPUESTARIA</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">CANTIDAD</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">PRECIO UNIT</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">TOTAL (BS)</th>
                 </tr>
-                @endfor
-
+            </thead>
+            <tbody class="table-striped">
+                @foreach ($products as $i => $product)
                 <tr>
-                    <td class="text-left" colspan="7"><strong>VALOR TOTAL DE COMPRA DEL BIEN O SERVICIO EN BS.</strong></td>
-                    <td class="text-right"><strong>{{ number_format($products->sum(function($product) {return $product['total'];}), 2) }}</strong></td>
+                    <td class="text-center">{{ ++$i }}</td>
+                    <td class="text-center">{{ $product['supplier'] }}</td>
+                    <td class="text-center">{{ $request_date }}</td>
+                    <td class="text-center">{{ $product['number_invoice'] }}</td>
+                    <td class="text-center">{{ $product['code_group'] }}</td>
+                    <td class="text-center">{{ $product['quantity'] }}</td>
+                    <td class="text-center">{{ $product['price'] }}</td>
+                    <td class="text-right">{{ number_format($product['total'], 2)}}</td>
                 </tr>
-                <tr>
+                @endforeach
+                @for($i = sizeof($products) + 1; $i <= $max_requests; $i++)
+                    <tr>
                     <td class="text-center" colspan="8">&nbsp;</td>
-                </tr>
-                <tr>
-                    <td class="text-left" colspan="7"><strong>SALDO A DEVOLVER EN BS.</strong></td>
-                    <td class="text-right">
-                        <strong>
-                            {{
+                    </tr>
+                    @endfor
+
+                    <tr>
+                        <td class="text-left" colspan="7"><strong>VALOR TOTAL DE COMPRA DEL BIEN O SERVICIO EN BS.</strong></td>
+                        <td class="text-right"><strong>{{ number_format($products->sum(function($product) {return $product['total'];}), 2) }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center" colspan="8">&nbsp;</td>
+                    </tr>
+                    <tr>
+                        <td class="text-left" colspan="7"><strong>SALDO A DEVOLVER EN BS.</strong></td>
+                        <td class="text-right">
+                            <strong>
+                                {{
                 number_format(
                     $total_petty_cash - $products->sum(function($product) { return $product['total']; }),
                     2
                 )
             }}
-                        </strong>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="text-center" colspan="8">&nbsp;</td>
-                </tr>
-                <tr>
-                    <td class="text-left" colspan="7"><strong>VALOR ENTREGADO EN BS.</strong></td>
-                    <td class="text-right"><strong>{{ $total_petty_cash }}</strong></td>
-                </tr>
-        </tbody>
-    </table>
-    <br />
-    <div class="leading-tight text-sm text-left m-b-10">
-        <strong>Lugar y Fecha:</strong> ________________________________________
-    </div>
-    <br />
-    <div class="leading-tight text-sm text-left m-b-10">
-        <table class="w-100 text-sm uppercase" style="width: 100%; margin-top: 20px;">
+                            </strong>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-center" colspan="8">&nbsp;</td>
+                    </tr>
+                    <tr>
+                        <td class="text-left" colspan="7"><strong>VALOR ENTREGADO EN BS.</strong></td>
+                        <td class="text-right"><strong>{{ $total_petty_cash }}</strong></td>
+                    </tr>
+            </tbody>
+        </table>
+        <br />
+        <div class="leading-tight text-sm text-left m-b-10">
+            <strong>Lugar y Fecha:</strong> ________________________________________
+        </div>
+        <br />
+
+        <table class="w-100 text-sm uppercase" style="width: 100%; margin-top: 10px;">
             <tr>
                 <td class="text-center" style="width: 50%; vertical-align: top;">
                     <br /><br />
@@ -208,8 +196,7 @@ $dns = new DNS2D();
                     <br />
                     <strong>Entregué Conforme: </strong>
                     <br /><br />
-                    <br /><br />
-                    <br /><br />
+                    
                 </td>
                 <td class="text-center" style="width: 50%; vertical-align: top;">
                     <br /><br />
@@ -217,13 +204,17 @@ $dns = new DNS2D();
                     <br />
                     <strong>Recibí Conforme:</strong>
                     <br /><br />
-                    <br /><br />
-                    <br /><br />
+    
                 </td>
             </tr>
         </table>
-    </div>
 
+        @if($it == 0)
+        <div class="scissors-rule">
+            <span>------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------</span>
+        </div>
+        @endif
+        @endfor
 </body>
 
 </html>

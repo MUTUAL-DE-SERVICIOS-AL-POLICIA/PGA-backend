@@ -39,6 +39,8 @@ Route::group([
     Route::post('/personal_transpor_tickets', [ProductController::class, 'create_note_tickets']);
     Route::get('/controlNote', [NoteEntriesController::class, 'controlNote']);
 
+    Route::post('/tickets_departure', [PettycashController::class, 'tickets_departure']);
+
 
     Route::get('/AccountabilitySheet2', [PettycashController::class, 'Print_Accountability_sheet']);
 
@@ -125,6 +127,7 @@ Route::group([
         Route::get('/listPettyNoteCash', [PettycashController::class, 'listNotePettyCashes']);
         Route::post('/sendGroup', [PettycashController::class, 'deliveredGroupProduct']);
         Route::post('/send_changes_funds', [PettycashController::class, 'changes_funds']);
+        Route::post('/postDeliveyOfResources', [PettycashController::class, 'postDeliveyOfResources']);
 
         Route::get('/php-config', function () {
             return response()->json([

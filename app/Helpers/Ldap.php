@@ -30,6 +30,7 @@ class Ldap
     $this->config['ldap_url'] .= $this->config['ldap_host'];
     $this->config['ldap_url'] = implode(':', [$this->config['ldap_url'], $this->config['ldap_port']]);
     $this->connection = @ldap_connect($this->config['ldap_url']);
+    
 
     ldap_set_option($this->connection, LDAP_OPT_PROTOCOL_VERSION, 3);
     ldap_set_option($this->connection, LDAP_OPT_REFERRALS, 0);

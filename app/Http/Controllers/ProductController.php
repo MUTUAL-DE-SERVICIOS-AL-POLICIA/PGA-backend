@@ -11,6 +11,7 @@ use App\Models\Material;
 use App\Models\PettyCash;
 use App\Models\PettyCash_Product;
 use App\Models\Product;
+use App\Models\Ticket;
 use App\Models\TypePetty;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -106,26 +107,58 @@ class ProductController extends Controller
             $approximate_cost += $productData['quantity'] * $productData['price'];
         }
 
-        $notePettyCash = PettyCash::create([
-            'number_note' => $number_note,
-            'concept' => $request['concept'],
-            'request_date' => today()->toDateString(),
-            'approximate_cost' => $approximate_cost,
-            'state' => 'En Revision',
-            'user_register' => $request['id'],
-            'management_id' => $period->id,
-            'fund_id' => $fund->id,
-            'type_cash_id' => $request->type
-
-        ]);
-
-        foreach ($request['product'] as $productData) {
-            $notePettyCash->products()->attach($productData['id'], [
-                'amount_request' => $productData['quantity'],
-                'name_product' => $productData['description'],
-                'costDetails' => $productData['price']
+        if ($request->type == 2) {
+            $notePettyCash = PettyCash::create([
+                'number_note' => $number_note,
+                'concept' => $request['concept'],
+                'approximate_cost' => $approximate_cost,
+                'replacement_cost' => $approximate_cost,
+                'request_date' => today()->toDateString(),
+                'delivery_date' => today()->toDateString(),
+                'state' => 'Aceptado',
+                'comment_recived' => 'Aun no puede imprimir',
+                'user_register' => $request['id'],
+                'management_id' => $period->id,
+                'fund_id' => $fund->id,
+                'type_cash_id' => $request->type
             ]);
+
+            foreach ($request['product'] as $productData) {
+                $notePettyCash->products()->attach($productData['id'], [
+                    'amount_request' => $productData['quantity'],
+                    'number_invoice' => $productData['invoice'],
+                    'name_product' => $productData['description'],
+                    'supplier' => $productData['provider'],
+                    'costDetails' => $productData['price'],
+                    'quantity_delivered' => $productData['quantity'],
+                    'costDetailsFinal' => $productData['price'],
+                    'costTotal' => ($productData['quantity'] * $productData['price']),
+                ]);
+            }
+        } else {
+
+            $notePettyCash = PettyCash::create([
+                'number_note' => $number_note,
+                'concept' => $request['concept'],
+                'approximate_cost' => $approximate_cost,
+                'state' => 'En Revision',
+                'user_register' => $request['id'],
+                'management_id' => $period->id,
+                'fund_id' => $fund->id,
+                'type_cash_id' => $request->type
+
+            ]);
+
+            foreach ($request['product'] as $productData) {
+                $notePettyCash->products()->attach($productData['id'], [
+                    'amount_request' => $productData['quantity'],
+                    'name_product' => $productData['description'],
+                    'costDetails' => $productData['price']
+                ]);
+            }
         }
+
+
 
 
         return response()->json($notePettyCash->load('products'), 201);
@@ -134,57 +167,62 @@ class ProductController extends Controller
 
     public function create_note_tickets(Request $request)
     {
-        $request_tickest = DB::select(
-            "SELECT d.created_at, d.code, e.id, CONCAT(e.first_name, ' ', e.last_name, ' ', e.mothers_last_name) AS full_name
+        logger($request);
+        $request_tickest = DB::selectOne(
+            "SELECT d.description, d.created_at, d.code, e.id, CONCAT(e.first_name, ' ', e.last_name, ' ', e.mothers_last_name) AS full_name
              FROM public.departures d, public.employees e
              WHERE d.id = :requestId AND d.employee_id = e.id",
             ['requestId' => $request->requestId]
         );
 
         if ($request_tickest) {
-
-            $formattedDate = isset($request_tickest[0]->created_at)
-                ? Carbon::parse($request_tickest[0]->created_at)->format('Y-m-d')
-                : null;
-            $lastNoteNumber = PettyCash::max('number_note');
-            $number_note = $lastNoteNumber ? $lastNoteNumber + 1 : 1;
             $period = Management::latest()->first();
             $fund = Fund::latest()->first();
-            $totalCost = 0;
-            if (isset($request->transfers) && is_array($request->transfers)) {
-                $totalCost = array_sum(array_column($request->transfers, 'cost'));
-            }
+            $lastNoteNumber = PettyCash::max('number_note');
+            $number_note = $lastNoteNumber ? $lastNoteNumber + 1 : 1;
 
-            $notePettyCash = PettyCash::create([
+            logger([
                 'number_note' => $number_note,
-                'concept' => 'TRANSPORTE PERSONAL',
-                'request_date' => $formattedDate,
-                'delivery_date' => $formattedDate,
-                'approximate_cost' => $totalCost,
-                'replacement_cost' => $totalCost,
-                'state' => 'Finalizado',
-                'user_register' => $request_tickest[0]->id,
+                'concept' => "(TRANSPORTE) $request_tickest->description",
+                'approximate_cost' => $request->total,
+                'replacement_cost' => $request->total,
+                'request_date' => today()->toDateString(),
+                'state' => 'En Revision',
+                'user_register' => $request_tickest->id,
                 'management_id' => $period->id,
                 'fund_id' => $fund->id,
+                'type_cash_id' => $request->type
             ]);
-            $product = Product::where('description', 'PASAJES')->first();
-            if ($product) {
-                $notePettyCash->products()->attach($product->id, [
-                    'amount_request' => 1,
-                    'number_invoice' => $request_tickest[0]->code,
-                    'name_product' => $product->cost_object,
-                    'supplier' => null,
-                    'costDetails' => $totalCost,
-                    'costFinal' => $totalCost,
-                ]);
-                $product->update([
-                    'group_id' => 42,
-                ]);
-            }
 
-            return response()->json(['message' => 'Petty cash updated successfully.'], 200);
-        } else {
-            return false;
+            // $notePettyCash = PettyCash::create([
+            //     'number_note' => $number_note,
+            //     'concept' => $request_tickest->description,
+            //     'approximate_cost' => $request->total,
+            //     'replacement_cost' => $request->total,
+            //     'request_date' => today()->toDateString(),
+            //     'state' => 'En Revision',
+            //     'user_register' => $request_tickest->id,
+            //     'management_id' => $period->id,
+            //     'fund_id' => $fund->id,
+            //     'type_cash_id' => $request->type
+            // ]);
+
+            foreach($request['transfers'] as $trasnfer){
+
+                logger([
+                'from' => $trasnfer['from'],
+                'to' => $trasnfer['to'],
+                'id_permission' => $request->requestId,
+                'state' => "No Cancelado",
+                'ticker_invoice' => $request_tickest->code,
+                'pettycash_id' => 41,
+                'group_id' => 41,
+            ]);
+
+                // $ticket = Ticket::create([
+
+                // ]);
+            }
         }
     }
     public function titlePerson($idPersona)
@@ -385,7 +423,7 @@ class ProductController extends Controller
 
             $to = PettyCash::create([
                 'number_note' => $from->number_note,
-                'concept' => $from->concept,
+                'concept' => "(REEMBOLSO) $from->concept",
                 'request_date' => $from->request_date,
                 'delivery_date' => today()->toDateString(),
                 'comment_recived' => 'Aun no puede imprimir',
@@ -475,7 +513,7 @@ class ProductController extends Controller
         });
 
         $data = [
-            'title' => 'DESCARGO DE ',
+            'title' => 'DESCARGO DE CAJA CHICA',
             'subtitle' => $type->description,
             'code' => $type->code,
             'number_note' => $notepettyCash->number_note,

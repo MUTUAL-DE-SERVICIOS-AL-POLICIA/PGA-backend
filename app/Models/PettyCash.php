@@ -35,4 +35,8 @@ class PettyCash extends Model
     {
         return $this->belongsTo(TypePetty::class);
     }
+
+    public function Tickets(){
+        return $this->hasMany(Ticket::class);
+    }
 }

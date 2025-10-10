@@ -12,6 +12,7 @@ use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PettycashController extends Controller
 {
@@ -318,7 +319,6 @@ class PettycashController extends Controller
         $notes = PettyCash::with(['products' => function ($q) {
             $q->select('products.id', 'description');
         }])
-            ->whereIn('state', ['Aceptado', 'Finalizado'])
             ->orderByDesc('id')
             ->get(['id', 'number_note', 'concept', 'request_date', 'approximate_cost', 'state', 'comment_recived', 'user_register', 'delivery_date']);
 
@@ -355,6 +355,7 @@ class PettycashController extends Controller
                         'costDetail' => optional($p->pivot)->costDetails,
                         'amount_request' => optional($p->pivot)->amount_request,
                         'quantity_delivered' => optional($p->pivot)->quantity_delivered,
+                        'costDetailsFinal' => optional($p->pivot)->costDetailsFinal,
                         'invoice_number' => optional($p->pivot)->number_invoice,
                     ];
                 })->values(),
@@ -382,11 +383,12 @@ class PettycashController extends Controller
         $note->comment_recived = '';
         $note->state = 'Finalizado';
         $note->save();
+        $total = ($note->approximate_cost - $note->replacement_cost);
 
         return response()->json([
             'note' => $note,
             'status' => true,
-            'message' => 'Se modificaron los grupos'
+            'message' => "Se recibio el monto de $total bs y se modificaron los grupos"
         ], 200);
     }
 
@@ -405,5 +407,33 @@ class PettycashController extends Controller
         //Actualizar los fondos iniciados 
         logger($request);
         
+    }
+
+    public function tickets_departure(Request $request){
+        
+        $request_tickest = DB::select(
+            "SELECT d.created_at, d.code, e.id, CONCAT(e.first_name, ' ', e.last_name, ' ', e.mothers_last_name) AS full_name
+             FROM public.departures d, public.employees e
+             WHERE d.employee_id = :employeId",
+            ['employeId' => 338]
+        );
+
+        logger($request_tickest);
+    }
+
+    public function postDeliveyOfResources(Request $request){   
+        
+        $note = PettyCash::whereId($request->id)->first();
+        $note->request_date = today()->toDateString();
+
+        $note->save();
+
+        $approximate = $note->approximate_cost;
+
+        return response()->json([
+            'note' => $note,
+            'status' => true,
+            'message' => "$approximate bs"
+        ], 200);
     }
 }

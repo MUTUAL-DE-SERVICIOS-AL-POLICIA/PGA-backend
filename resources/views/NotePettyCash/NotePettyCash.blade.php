@@ -2,7 +2,7 @@
 
 use \Milon\Barcode\DNS2D;
 
-$max_requests = 7;
+$max_requests = 5;
 
 $dns = new DNS2D();
 
@@ -22,7 +22,7 @@ $dns = new DNS2D();
         }
 
         body {
-            font-size: 12px;
+            font-size: 10px;
             /* Cambia según sea necesario */
         }
 
@@ -66,15 +66,15 @@ $dns = new DNS2D();
         }
 
         .p-l-5 {
-            padding-left: 5px;
+            padding-left: 3px;
         }
 
         .text-xs {
-            font-size: 10px;
+            font-size: 8px;
         }
 
         .text-xxxs {
-            font-size: 8px;
+            font-size: 6px;
         }
 
         .table-large-font {
@@ -86,7 +86,8 @@ $dns = new DNS2D();
 </head>
 
 <body style="border: 0; border-radius: 0;">
-    <table class="w-100 uppercase" style="margin-top: 50px;">
+    @for($it = 0; $it<2; $it++)
+        <table class="w-100 uppercase" style="margin-top: 20px;">
         <tr>
             <th class="w-25 text-left no-paddings no-margins align-middle">
                 <div class="text-left">
@@ -95,9 +96,9 @@ $dns = new DNS2D();
             </th>
             <th class="w-50 align-top">
                 <div class="font-hairline leading-tight text-xs">
-                    <div>MUTUAL DE SERVICIOS AL POLICÍA "MUSERPOL"</div>
-                    <div>DIRECCIÓN DE ASUNTOS ADMINISTRATIVOS</div>
-                    <div>UNIDAD ADMINISTRATIVA</div>
+                    <div>FORMULARIO N° 1</div>
+                    <div>VALE DE CAJA CHICA</div>
+                    <div>{{$subtitle}}</div>
                 </div>
             </th>
             <th class="w-25 no-padding no-margins align-top">
@@ -115,114 +116,91 @@ $dns = new DNS2D();
                 </table>
             </th>
         </tr>
-    </table>
-    <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
-    <div class="block">
-        <div class="leading-tight text-sm text-center m-b-10">FORMULARIO N° 1</div>
-        <div class="leading-tight text-sm text-center m-b-10">{{ $title }}{{ $subtitle }}</div>
-    </div>
-    <div class="leading-tight text-sm text-left m-b-10">
-        <strong>DESEMBOLSO:</strong>
-    </div>
-    <div class="leading-tight text-sm text-left m-b-10">
-        He recibido del Responsable de Caja Chica con cargo a rendición de cuenta documentada, la suma de:
-    </div>
-    <table class="table-code w-100 m-b-10 uppercase text-xs">
-        <tbody>
-            <tr>
-                <td class="w-75 p-l-5 table-large-font">{{ number_format($total, 2) }} Bs.</td>
-            </tr>
-            <tr>
-                <td class="w-75 p-l-5 table-large-font">{{ $total_lit }}</td>
-            </tr>
-        </tbody>
-    </table>
-    <div class="leading-tight text-sm text-left m-b-10">
-        <strong>POR CONCEPTO: {{$concept}}</strong>
-    </div>
-    <div class="leading-tight text-sm text-left m-b-10">
-        <strong>SOLICITADO:</strong>
-    </div>
-    <table class="table-info w-100 m-b-10 uppercase text-xs">
-        <thead>
-            <tr>
-                <th class="text-center bg-grey-darker text-white">ITEM</th>
-                <th class="text-center bg-grey-darker text-white border-left-white">DESCRIPCIÓN</th>
-                <th class="text-center bg-grey-darker text-white border-left-white">CANTIDAD</th>
-                <th class="text-center bg-grey-darker text-white border-left-white">PRECIO UNITARIO</th>
-                <th class="text-center bg-grey-darker text-white border-left-white">PRECIO TOTAL</th>
-            </tr>
-        </thead>
-        <tbody class="table-striped">
-            @foreach ($products as $i => $product)
-            <tr>
-                <td class="text-center">{{ ++$i }}</td>
-                <td class="text-center">{{ $product['description'] }}</td>
-                <td class="text-center">{{ $product['quantity'] }}</td>
-                <td class="text-right">{{ number_format($product['price'],2) }}</td>
-                <td class="text-right">{{ number_format(($product['quantity'] * $product['price']),2) }}</td>
-            </tr>
-            @endforeach
-            @for($i = sizeof($products) + 1; $i <= $max_requests; $i++)
-                <tr>
-                <td class="text-center" colspan="7">&nbsp;</td>
-                </tr>
-                @endfor
-                <tr>
-                    <td class="text-center" colspan="4"><strong>TOTAL</strong></td>
-                    <td class="text-right"><strong>{{ number_format($products->sum(function($product) {return $product['price'] * $product['quantity'];}), 2) }}</strong></td>
-                </tr>
-        </tbody>
-    </table>
-    <div class="leading-tight text-sm text-left m-b-10">
-        El descargo será previa presentación de la documentación de sustento del gasto.
-    </div>
-    <div class="leading-tight text-sm text-left m-b-10">
-        <strong>COMPROMISO:</strong>
-    </div>
-    <div class="leading-tight text-sm text-left m-b-10" style="text-align: justify;">
-        En sujeción al inciso c) del artículo 27 de la Ley 1178 del 20 de julio de 1990 de Administración y Control Gubernamentales
-        (SAFCO), me comprometo a rendir cuentas, presentando la documentación sustentatoria original, auténtica y fidedigna, <strong><u>en
-                el plazo máximo de 48 horas hábiles siguientes de recibido el efectivo.</u></strong>
-    </div>
-    <div class="leading-tight text-sm text-left m-b-10" style="text-align: justify;">
-        Conozco que en el caso contrario, son aplicables en mi contra las normas del Decreto Supremo No. 23318-A del 3 de noviembre de 1992 que aprueba el Reglamento de la Responsabilidad por la Función Pública y el Reglamento de Caja Chica vigente de la MUSERPOL. Asimismo acepto que la no devolución o descargo de los recursos dentro del plazo estipulado en el presente reglamento acepto que el importe sea descontado de mis haberes.
-    </div>
-    <div class="leading-tight text-sm text-left m-b-10">
-        <strong>Lugar y Fecha:</strong> ________________________________________
-    </div>
-    <br />
-    <div class="leading-tight text-sm text-left m-b-10">
-        <table class="w-100 text-sm uppercase" style="width: 100%; margin-top: 20px;">
-            <tr>
-                <td class="text-center" style="width: 50%; vertical-align: top;">
-                    <br /><br />
-                    ____________________________
-                    <br />
-                    <strong>Solicitado por: {{$employee}}</strong>
-                    <br /><br />
-                    <br /><br />
-                    <br /><br />
-                    ____________________________
-                    <br />
-                    <strong>Visto Bueno:</strong>
-                </td>
-                <td class="text-center" style="width: 50%; vertical-align: top;">
-                    <br /><br />
-                    ____________________________
-                    <br />
-                    <strong>Autorizado por:</strong>
-                    <br /><br />
-                    <br /><br />
-                    <br /><br />
-                    ____________________________
-                    <br />
-                    <strong>Entregue conforme:</strong>
-                </td>
-            </tr>
         </table>
-    </div>
-
+        <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
+        <div class="leading-tight text-left">
+            <strong>DESEMBOLSO:</strong>
+        </div>
+        <div class="leading-tight text-xs text-left">
+            He recibido del Responsable de Caja Chica con cargo a rendición de cuenta documentada, la suma de:
+        </div>
+        <table class="table-code w-100 m-b-10 uppercase ">
+            <tbody>
+                <tr>
+                    <td class="w-75 p-l-5 table-large-font">{{ number_format($total, 2) }} Bs.</td>
+                </tr>
+                <tr>
+                    <td class="w-75 p-l-5 table-large-font">{{ $total_lit }}</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="leading-tight  text-left ">
+            <strong>POR CONCEPTO: {{$concept}}</strong>
+        </div>
+        <table class="table-info w-100 m-b-10 uppercase text-xs">
+            <thead>
+                <tr>
+                    <th class="text-center bg-grey-darker text-white">ITEM</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">DESCRIPCIÓN</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">CANTIDAD</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">PRECIO UNITARIO</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">PRECIO TOTAL</th>
+                </tr>
+            </thead>
+            <tbody class="table-striped">
+                @foreach ($products as $i => $product)
+                <tr>
+                    <td class="text-center">{{ ++$i }}</td>
+                    <td class="text-center">{{ $product['description'] }}</td>
+                    <td class="text-center">{{ $product['quantity'] }}</td>
+                    <td class="text-right">{{ number_format($product['price'],2) }}</td>
+                    <td class="text-right">{{ number_format(($product['quantity'] * $product['price']),2) }}</td>
+                </tr>
+                @endforeach
+                @for($i = sizeof($products) + 1; $i <= $max_requests; $i++)
+                    <tr>
+                    <td class="text-center" colspan="7">&nbsp;</td>
+                    </tr>
+                    @endfor
+                    <tr>
+                        <td class="text-center" colspan="4"><strong>TOTAL</strong></td>
+                        <td class="text-right"><strong>{{ number_format($products->sum(function($product) {return $product['price'] * $product['quantity'];}), 2) }}</strong></td>
+                    </tr>
+            </tbody>
+        </table>
+        <div class="leading-tight text-left m-b-10">
+            El descargo será previa presentación de la documentación de sustento del gasto.
+        </div>
+        <div class="leading-tight text-left m-b-10">
+            <strong>COMPROMISO:</strong>
+        </div>
+        <div class="leading-tight text-left m-b-10" style="text-align: justify;">
+            En sujeción al inciso c) del artículo 27 de la Ley 1178 del 20 de julio de 1990 de Administración y Control Gubernamentales
+            (SAFCO), me comprometo a rendir cuentas, presentando la documentación sustentatoria original, auténtica y fidedigna, <strong><u>en
+                    el plazo máximo de 48 horas hábiles siguientes de recibido el efectivo.</u></strong>
+        </div>
+        <div class="leading-tight text-left m-b-10" style="text-align: justify;">
+            Conozco que en el caso contrario, son aplicables en mi contra las normas del Decreto Supremo No. 23318-A del 3 de noviembre de 1992 que aprueba el Reglamento de la Responsabilidad por la Función Pública y el Reglamento de Caja Chica vigente de la MUSERPOL. Asimismo acepto que la no devolución o descargo de los recursos dentro del plazo estipulado en el presente reglamento acepto que el importe sea descontado de mis haberes.
+        </div>
+        <div class="leading-tight text-left m-b-10">
+            <strong>Lugar y Fecha:</strong> ________________________________________
+        </div>
+        <table class="w-100" style="margin-top: 50px;">
+            <tbody>
+                <tr class="align-bottom text-center text-xxxs" style="height: 120px; vertical-align: bottom;">
+                    <td class="rounded w-33">&nbsp;Solicitado por:</td>
+                    <td class="rounded w-33">&nbsp;Autorizado por:</td>
+                    <td class="rounded w-33">&nbsp;Visto Bueno</td>
+                    <td class="rounded w-33">&nbsp;Entregué Conforme</td>
+                </tr>
+            </tbody>
+        </table>
+        @if($it == 0)
+        <div class="scissors-rule">
+            <span>------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------</span>
+        </div>
+        @endif
+        @endfor
 </body>
 
 </html>
