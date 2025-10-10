@@ -23,7 +23,15 @@ class Supplier extends Model
     protected $dates = ['deleted_at'];
 
 
-    public function Note_entries(){
+    public function Note_entries()
+    {
         return $this->hasMany(Note_Entrie::class);
+    }
+
+    public function noteEntries()
+    {
+        return $this->belongsToMany(Note_Entrie::class, 'note_entrie_supplier', 'supplier_id', 'note_entrie_id')
+            ->withPivot('invoice_number') // acá agregamos el campo
+            ->withTimestamps();
     }
 }

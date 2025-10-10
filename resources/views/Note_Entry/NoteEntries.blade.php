@@ -23,21 +23,29 @@
     <div class="block">
         <div class="leading-tight text-center m-b-10 text-xs">{{ $title }}</div>
 
-        <table class="table-code w-100 m-b-10 uppercase text-xs">
+        <table class="table-code w-100 m-b-10 uppercase text-xs" style="table-layout: fixed;">
+            <colgroup>
+                <col style="width: 25%;">
+                <col style="width: 25%;">
+                <col style="width: 25%;">
+                <col style="width: 25%;">
+            </colgroup>
             <tbody>
+                @foreach ($suppliers as $index => $supplier)
                 <tr>
                     <td class="text-center bg-grey-darker text-white">DATOS DE PROVEEDOR</td>
-                    <td>{{ $supplier_name }}</td>
-                </tr>
-                <tr>
+                    <td>{{ $supplier['supplier_name'] }}</td>
                     <td class="text-center bg-grey-darker text-white">N° DE FACTURA</td>
-                    <td>{{ $invoice_number }}</td>
+                    <td>{{ $supplier['invoice_number'] }}</td>
                 </tr>
+                @endforeach
                 <tr>
                     <td class="text-center bg-grey-darker text-white">FECHA</td>
-                    <td>{{ $delivery_date }}</td>
+                    <td colspan="3">{{ $delivery_date }}</td>
                 </tr>
             </tbody>
+        </table>
+
         </table>
         <div class="table-container uppercase">
             <table class="table-info">

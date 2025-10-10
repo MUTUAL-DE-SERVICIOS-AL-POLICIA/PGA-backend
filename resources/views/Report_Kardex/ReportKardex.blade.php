@@ -68,6 +68,18 @@ $dns = new DNS2D();
         <div class="block">
             <div class="leading-tight text-sm text-center m-b-10">{{ $title }}</div>
             <div class="leading-tight text-xxxl text-center m-b-10">(EXPRESADO EN BOLIVIANOS)</div>
+            @if ($start_date && $end_date)
+            <div class="leading-tight text-xs text-center m-b-10">
+                <strong>DESDE:</strong> {{ \Carbon\Carbon::parse($start_date)->format('d/m/Y') }}
+                &nbsp;&nbsp;&nbsp;
+                <strong>HASTA:</strong> {{ \Carbon\Carbon::parse($end_date)->format('d/m/Y') }}
+            </div>
+            @elseif ($end_date)
+            <div class="leading-tight text-xs text-center m-b-10">
+                <strong>HASTA:</strong> {{ \Carbon\Carbon::parse($end_date)->format('d/m/Y') }}
+            </div>
+            @endif
+
             <table class="table-code w-100 m-b-10 uppercase text-xs">
                 <tbody>
                     <tr>
@@ -94,8 +106,10 @@ $dns = new DNS2D();
                     <tr>
                         <th class="text-center bg-grey-darker text-white" rowspan="2">FECHA</th>
                         <th class="text-center bg-grey-darker text-white border-left-white" rowspan="2">DETALLE</th>
+                        <th class="text-center bg-grey-darker text-white border-left-white" rowspan="2">SALDO INICIAL</th>
                         <th class="text-center bg-grey-darker text-white border-left-white" colspan="3">CANTIDAD</th>
                         <th class="text-center bg-grey-darker text-white border-left-white" rowspan="2">PRECIO UNITARIO</th>
+                        <th class="text-center bg-grey-darker text-white border-left-white" rowspan="2">SALDO INICIAL</th>
                         <th class="text-center bg-grey-darker text-white border-left-white" colspan="3">IMPORTES</th>
                     </tr>
                     <tr>
@@ -108,14 +122,35 @@ $dns = new DNS2D();
                     </tr>
                 </thead>
                 <tbody class="table-striped">
+
+                    <tr>
+                        <td class="text-center">{{$firtsDay}}</td>
+                        <td class="text-center">SALDO DEL {{$lastDay}}</td>
+                        <td class="text-center">
+                            {{$balance_amount_entries}}
+                        </td>
+                        <td class="text-left"></td>
+                        <td class="text-left"></td>
+                        <td class="text-left"></td>
+                        <td class="text-left"></td>
+                        <td class="text-center">
+                            {{$balance_cost_total}}
+                        </td>
+                        <td class="text-left"></td>
+                        <td class="text-left"></td>
+                        <td class="text-left"></td>
+                    </tr>
+
                     @foreach ($kardex_de_existencia as $index => $kardex)
                     <tr>
                         <td class="text-center">{{$kardex['date']}}</td>
                         <td class="text-left">{{$kardex['description']}}</td>
+                        <td class="text-left"></td>
                         <td class="text-center">{{$kardex['entradas']}}</td>
                         <td class="text-center">{{$kardex['salidas']}}</td>
                         <td class="text-center">{{$kardex['stock_fisico']}}</td>
                         <td class="text-right">{{ number_format($kardex['cost_unit'], 2) }}</td>
+                        <td class="text-left"></td>
                         <td class="text-right">
                             {{ $kardex['importe_entrada'] ? number_format($kardex['importe_entrada'], 2) : '---' }}
                         </td>
@@ -128,7 +163,40 @@ $dns = new DNS2D();
 
                     </tr>
                     @endforeach
+                    <tr style="background-color: #d1f2eb; font-weight: bold;">
+                        <td></td>
+                        <td class="text-left">TOTAL</td>
+                        <td class="text-center">
+                            {{$balance_amount_entries}}
+                        </td>
+                        <td class="text-center">{{ $totales['entradas'] }}</td>
+                        <td class="text-center">{{ $totales['salidas'] }}</td>
+                        <td class="text-center">{{ $totales['stock_fisico'] }}</td>
+                        <td class="text-right">---</td>
+                        <td class="text-center">
+                            {{$balance_cost_total}}
+                        </td>
+                        <td class="text-right">{{ number_format($totales['importe_entrada'], 2) }}</td>
+                        <td class="text-right">{{ number_format($totales['importe_salida'], 2) }}</td>
+                        <td class="text-right">{{ number_format($totales['importe_saldo'], 2) }}</td>
+                    </tr>
                 </tbody>
+            </table>
+            <br><br><br>
+
+            <table class="w-100 text-xs" style="margin-top: 40px;">
+                <tr>
+                    <td style="width: 50%; text-align: center;">
+                        <div style="border-top: 1px solid #000; width: 60%; margin: 0 auto; padding-top: 5px;">
+                            Elaborado por
+                        </div>
+                    </td>
+                    <td style="width: 50%; text-align: center;">
+                        <div style="border-top: 1px solid #000; width: 60%; margin: 0 auto; padding-top: 5px;">
+                            V.B.
+                        </div>
+                    </td>
+                </tr>
             </table>
         </div>
     </div>

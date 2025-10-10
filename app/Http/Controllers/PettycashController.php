@@ -267,11 +267,6 @@ class PettycashController extends Controller
         return $data;
     }
 
-    public function FullDischarge(Request $request)
-    {
-        logger($request);
-    }
-
     public function PaymentOrder(Request $request)
     {
         $fund = Fund::latest()->first();

@@ -105,7 +105,6 @@ class NoteRequestController extends Controller
         ], 200);
     }
 
-
     public function listUserNoteRequests($userId)
     {
         $noteRequests = NoteRequest::where('user_register', $userId)->with('materials')->orderBy('id', 'desc')->get();
@@ -245,78 +244,73 @@ class NoteRequestController extends Controller
 
     public function print_request(NoteRequest $note_request)
     {
-
         $user = User::where('employee_id', $note_request->user_register)->first();
-        if ($user) {
-            $positionName = $this->titlePerson($note_request->user_register);
-            $employee = Employee::find($note_request->user_register);
-            $file_title = 'SOLICITUD DE MATERIAL DE ALMACÉN';
-            $materials = $note_request->materials()->get()->map(function ($material) {
-                return [
-                    'description' => $material->description,
-                    'unit_material' => $material->unit_material,
-                    'cost_unit' => $material->average_cost,
-                    'amount_request' => $material->pivot->amount_request,
-                ];
-            });
 
-            $data = [
-                'title' => 'SOLICITUD DE MATERIAL DE ALMACÉN',
-                'number_note' => $note_request->number_note,
-                'date' => Carbon::parse($note_request->request_date)->format('d-m-Y'),
-                'employee' => $employee
-                    ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}"
-                    : null,
-                'position' => $positionName,
-                'materials' => $materials,
-                'comment_request' => $note_request->observation_request,
-                'comment' => $note_request->observation,
-            ];
-            $options = [
-                'page-width' => '216',
-                'page-height' => '279',
-                'margin-top' => '4',
-                'margin-bottom' => '4',
-                'margin-left' => '5',
-                'margin-right' => '5',
-                'encoding' => 'UTF-8',
-            ];
-
-            $pdf = Pdf::loadView('Material_Request.MaterialRequest', $data);
-            return $pdf->download('formulario_solicitud_de_material_de_almacén.pdf');
-        } else {
+        if (!$user) {
             $employee = Employee::where('id', $note_request->user_register)->first();
-            if ($employee) {
-                $positionName = $this->titlePerson($note_request->user_register);
-                $employee = Employee::find($note_request->user_register);
-                $file_title = 'SOLICITUD DE MATERIAL DE ALMACÉN';
-                $materials = $note_request->materials()->get()->map(function ($material) {
-                    return [
-                        'description' => $material->description,
-                        'unit_material' => $material->unit_material,
-                        'cost_unit' => $material->average_cost,
-                        'amount_request' => $material->pivot->amount_request,
-                    ];
-                });
-
-                $data = [
-                    'title' => 'SOLICITUD DE MATERIAL DE ALMACÉN',
-                    'number_note' => $note_request->number_note,
-                    'date' => Carbon::parse($note_request->request_date)->format('d-m-Y'),
-                    'employee' => $employee
-                        ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}"
-                        : null,
-                    'position' => $positionName,
-                    'materials' => $materials,
-                    'comment_request' => $note_request->observation_request,
-                    'comment' => $note_request->observation,
-                ];
-                $pdf = Pdf::loadView('Material_Request.MaterialRequest', $data);
-                return $pdf->download('formulario_solicitud_de_material_de_almacén.pdf');
-            } else {
-                return "no funciona";
-            }
+        } else {
+            $employee = Employee::find($note_request->user_register);
         }
+        if (!$employee) {
+            return "Empleado no encontrado";
+        }
+
+        $positionName = $this->titlePerson($note_request->user_register);
+        $file_title = 'SOLICITUD DE MATERIAL DE ALMACÉN';
+
+        $materials = $note_request->materials()->get()->map(function ($material)  {
+            $valor_unit = $this->get_cost_unit_of_material_with_balance($material);
+            return [
+                'description' => $material->description,
+                'unit_material' => $material->unit_material,
+                'cost_unit' => $valor_unit,
+                'amount_request' => $material->pivot->amount_request,
+            ];
+        });
+
+        $data = [
+            'title' => 'SOLICITUD DE MATERIAL DE ALMACÉN',
+            'number_note' => $note_request->number_note,
+            'date' => Carbon::parse($note_request->request_date)->format('d-m-Y'),
+            'employee' => "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}",
+            'position' => $positionName,
+            'materials' => $materials,
+            'comment_request' => $note_request->observation_request,
+            'comment' => $note_request->observation,
+        ];
+
+        $options = [
+            'page-width' => '216',
+            'page-height' => '279',
+            'margin-top' => '4',
+            'margin-bottom' => '4',
+            'margin-left' => '5',
+            'margin-right' => '5',
+            'encoding' => 'UTF-8',
+        ];
+
+        $pdf = Pdf::loadView('Material_Request.MaterialRequest', $data);
+        return $pdf->download('formulario_solicitud_de_material_de_almacén.pdf');
+    }
+
+    public function get_cost_unit_of_material_with_balance(Material $material)
+    {
+        $latestManagement = Management::latest('id')->first();
+        $entries = $material->noteEntries()
+            ->where('management_id', $latestManagement->id)
+            ->orderBy('number_note', 'asc')
+            ->get();
+
+        $entryWithBalance = $entries->firstWhere('pivot.request', '>', 0);
+
+        if (!$entryWithBalance) {
+            $entryWithBalance = $entries->last();
+        }
+
+        if ($entryWithBalance) {
+            return $entryWithBalance->pivot->cost_unit;
+        }
+        return null;
     }
 
     public function print_post_request(NoteRequest $note_request)
@@ -499,7 +493,6 @@ class NoteRequestController extends Controller
             'last_page' => ceil($totalNoteRequests / $limit),
             'data' => $response,
         ], 200);
-
     }
 
     public function titlePerson($idPersona)
