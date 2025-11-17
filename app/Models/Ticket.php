@@ -10,7 +10,17 @@ class Ticket extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = [];
+    protected $table = 'store.tickets';
+
+    protected $fillable = [
+        'pettycash_id',
+        'id_permission',   
+        'from',
+        'to',
+        'cost',
+        'ticket_invoice',
+        'group_id',
+    ];
 
     public function group()
     {
@@ -19,7 +29,11 @@ class Ticket extends Model
 
     public function pettyCash()
     {
-        return $this->belongsTo(PettyCash::class);
+        return $this->belongsTo(PettyCash::class, 'pettycash_id', 'id');
     }
 
+    public function departure()
+    {
+        return $this->belongsTo(Departure::class, 'id_permission', 'id');
+    }
 }

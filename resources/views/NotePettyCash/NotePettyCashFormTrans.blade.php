@@ -2,7 +2,7 @@
 
 use \Milon\Barcode\DNS2D;
 
-$max_requests = 5;
+$max_requests = 10;
 
 $dns = new DNS2D();
 
@@ -96,12 +96,7 @@ $dns = new DNS2D();
             </th>
             <th class="w-50 align-top">
                 <div class="font-hairline leading-tight text-xs">
-                    @if($type == 1)
                     <div>FORMULARIO N° 1</div>
-                    @endif
-                    @if($type == 2)
-                    <div>FORMULARIO N° 2</div>
-                    @endif
                     <div>VALE DE CAJA CHICA</div>
                     <div>{{$subtitle}}</div>
                 </div>
@@ -146,64 +141,45 @@ $dns = new DNS2D();
             <thead>
                 <tr>
                     <th class="text-center bg-grey-darker text-white">ITEM</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">DESCRIPCIÓN</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">CANTIDAD</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">PRECIO UNITARIO</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">PRECIO TOTAL</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">N° BOLETA</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">DESDE</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">HASTA</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">IMPORTE</th>
                 </tr>
             </thead>
             <tbody class="table-striped">
-                @foreach ($products as $i => $product)
+                @foreach ($routes as $i => $route)
                 <tr>
                     <td class="text-center">{{ ++$i }}</td>
-                    <td class="text-center">{{ $product['description'] }}</td>
-                    <td class="text-center">{{ $product['quantity'] }}</td>
-                    <td class="text-right">{{ number_format($product['price'],2) }}</td>
-                    <td class="text-right">{{ number_format(($product['quantity'] * $product['price']),2) }}</td>
+                    <td class="text-center">{{ $route['ticket_invoice'] }}</td>
+                    <td class="text-center">{{ $route['from'] }}</td>
+                    <td class="text-center">{{ $route['to'] }}</td>
+                    <td class="text-right">{{ $route['cost'] }}</td>
                 </tr>
                 @endforeach
-                @for($i = sizeof($products) + 1; $i <= $max_requests; $i++)
+                @for($i = sizeof($routes) + 1; $i <= $max_requests; $i++)
                     <tr>
                     <td class="text-center" colspan="7">&nbsp;</td>
                     </tr>
                     @endfor
                     <tr>
                         <td class="text-center" colspan="4"><strong>TOTAL</strong></td>
-                        <td class="text-right"><strong>{{ number_format($products->sum(function($product) {return $product['price'] * $product['quantity'];}), 2) }}</strong></td>
+                        <td class="text-right"><strong>{{ number_format($total, 2) }}</strong></td>
                     </tr>
             </tbody>
         </table>
-        
-        @if($type == 1)
         <div class="leading-tight text-left m-b-10">
-            El descargo será previa presentación de la documentación de sustento del gasto.
+            El reembolso por gasto de transporte será previa presentación del formulario adjuntando la boleta de comisión en original.
         </div>
-        @endif
-
-        @if($type == 2)
-        <div class="leading-tight text-left m-b-10">
-            El reembolso será previa presentación de la documentación de sustento del gasto.
-        </div>
-        @endif
-
         <div class="leading-tight text-left m-b-10">
             <strong>COMPROMISO:</strong>
         </div>
         <div class="leading-tight text-left m-b-10" style="text-align: justify;">
             En sujeción al inciso c) del artículo 27 de la Ley 1178 del 20 de julio de 1990 de Administración y Control Gubernamentales
-            (SAFCO), me comprometo a rendir cuentas, presentando la documentación sustentatoria original, auténtica y fidedigna,
-            @if($type == 1)
-            <strong><u>en el plazo máximo de 48 horas (2 dias habiles) de recibido el efectivo.</u></strong>
-            @endif
-            @if($type == 2)
-            <strong><u>en el plazo máximo de 5 dias habiles de la fecha la factura del servicio o compra de bienes.</u></strong>
-            @endif
+            (SAFCO), me comprometo a presentar la documentación sustentatoria original, auténtica y fidedigna <strong><u>en
+                    el plazo máximo de 5 dias hábiles de la fecha de la boleta de comisión.</u></strong>
         </div>
-        @if($type == 1)
-        <div class="leading-tight text-left m-b-10" style="text-align: justify;">
-            Conozco que en el caso contrario, son aplicables en mi contra las normas del Decreto Supremo No. 23318-A del 3 de noviembre de 1992 que aprueba el Reglamento de la Responsabilidad por la Función Pública y el Reglamento de Caja Chica vigente de la MUSERPOL. Asimismo acepto que la no devolución o descargo de los recursos dentro del plazo estipulado en el presente reglamento acepto que el importe sea descontado de mis haberes.
-        </div>
-        @endif
+        
         <div class="leading-tight text-left m-b-10">
             <strong>Lugar y Fecha:</strong> ________________________________________
         </div>

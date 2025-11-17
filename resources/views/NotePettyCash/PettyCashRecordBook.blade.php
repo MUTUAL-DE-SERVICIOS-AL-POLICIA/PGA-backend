@@ -5,19 +5,7 @@ use \Milon\Barcode\DNS2D;
 if (!extension_loaded('intl')) {
     die('La extensión Intl não está habilitada.');
 }
-$formatter = new IntlDateFormatter(
-    'es_ES',
-    IntlDateFormatter::LONG,
-    IntlDateFormatter::NONE,
-    null,
-    null,
-    'd \'DE\' MMMM \'DE\' y'
-);
-$fecha_actual = $formatter->format(new DateTime());
 
-$fecha_actual = strtoupper($fecha_actual);
-
-$date = '12/01/2024';
 $dns = new DNS2D();
 ?>
 <!DOCTYPE html>
@@ -40,10 +28,6 @@ $dns = new DNS2D();
             flex-direction: column;
             min-height: 100vh;
             font-size: 12px;
-        }
-
-        .content {
-            flex: 1;
         }
 
         .footer {
@@ -72,132 +56,117 @@ $dns = new DNS2D();
         .border-left-white {
             border-left: 1px solid white;
         }
+
+        .table-info-sm td,
+        .table-info-sm th {
+            font-size: 8px;
+            padding: 3px;
+        }
     </style>
 </head>
 
 <body>
-    <div class="content">
-        <table class="w-100 uppercase">
-            <tr>
-                <th class="w-25 text-left no-paddings no-margins align-middle">
-                    <div class="text-left">
-                        <img src="{{ public_path('/img/logo.png') }}" class="w-40">
-                    </div>
-                </th>
-                <th class="w-50 align-top">
-                    <div class="leading-tight text-xs">
-                        <div>MUTUAL DE SERVICIOS AL POLICÍA "MUSERPOL"</div>
-                        <div>DIRECCIÓN DE ASUNTOS ADMINISTRATIVOS</div>
-                        <div>UNIDAD ADMINISTRATIVA</div>
-                    </div>
-                </th>
-                <th class="w-25 no-padding no-margins align-top">
-                    <table class="table-code no-padding no-margins text-xxxs uppercase">
-                    </table>
-                </th>
-            </tr>
-        </table>
-        <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
-    </div>
+    <table class="w-100 uppercase">
+        <tr>
+            <th>
+                <table class="table-code w-100 m-b-10 uppercase">
+                    <tbody>
+                        <tr>
+                            <th class="bg-grey-darker text-white text-center" colspan="2">
+                                LIBRO DE REGISTROS COMPLETADOS
+                            </th>
+                        </tr>
+                        <tr>
+                            <td class="w-50 bg-grey-darker text-white">FECHA Y LUGAR</td>
+                            <td class="w-70 p-l-5"> LA PAZ, {{ $date }}</td>
+                        </tr>
+                        <tr>
+                            <td class="w-50 bg-grey-darker text-white">NOMBRE Y APELLIDO DEL CUSTODIO</td>
+                            <td class="w-70 p-l-5"> {{ $name }}</td>
+                        </tr>
+                        <tr>
+                            <td class="w-50 bg-grey-darker text-white">ÁREA/UNIDAD</td>
+                            <td class="w-70 p-l-5"> {{ $area }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </th>
+        </tr>
+    </table>
+    <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
 
     <div class="block">
-        <div class="leading-tight text-sm text-center m-b-10">{{ $title }}</div>
-        <div class="leading-tight text-xxxl text-center m-b-10">(EXPRESADO EN BOLIVIANOS)</div>
-        <table class="table-code w-100 m-b-10 uppercase text-xs">
-            <tbody>
-                <tr>
-                    <td class="w-30 text-center bg-grey-darker text-white">FECHA Y LUGAR</td>
-                    <td class="w-70 p-l-5"> LA PAZ, {{ $date }}</td>
-                </tr>
-                <tr>
-                    <td class="w-30 text-center bg-grey-darker text-white">NOMBRE Y APELLIDO DEL CUSTODIO</td>
-                    <td class="w-70 p-l-5"> {{ $name }}</td>
-                </tr>
-                <tr>
-                    <td class="w-30 text-center bg-grey-darker text-white">ÁREA/UNIDAD</td>
-                    <td class="w-70 p-l-5"> {{ $area }}</td>
-                </tr>
-            </tbody>
-        </table>
 
-        <table class="table-info w-100 m-b-10 uppercase text-xs">
+        <table class="table-info table-info-sm w-100 m-b-10 uppercase text-xs">
             <thead>
                 <tr>
                     <th class="text-center bg-grey-darker text-white">ITEM</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">FECHA</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">BENEFICIARIO</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">N° VALE</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">ENTREGADO</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">IMPORTE ENTREGADO</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">IMPORTE DEVUELTO</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">PROVEEDOR</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">N° FACTURA</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">CONCEPTO DE GASTO</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">PRODUCTO</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">PARTIDA</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">FACTURAR</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">INGRESOS</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">GASTO</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">SALDO</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td class="text-center">1</td>
-                    <td class="text-left">{{ $dataPettyCash['date_recived'] }}</td>
-                    <td class="text-left">{{ $dataPettyCash['name_responsibility'] }}</td>
-                    <td class="text-center">---</td>
-                    <td class="text-center">---</td>
-                    <td class="text-center">---</td>
-                    <td class="text-center">---</td>
-                    <td class="text-left">{{ $dataPettyCash['concept'] }}</td>
-                    <td class="text-center">---</td>
-                    <td class="text-center">---</td>
-                    <td class="text-center">{{ number_format($dataPettyCash['amount'], 2) }}</td>
-                </tr>
-                @foreach($book_diary as $entry)
+                @foreach ($book_diary as $entry)
                 @php
-
-                $ingresos = $entry['approximate_cost'] - $entry['replacement_cost'];
+                $products = $entry['products'] ?? [];
                 @endphp
+
+                @if (empty($products) || count($products) === 0)
                 <tr>
-                    <td class="text-center">{{ $loop->iteration + 1 }}</td>
-                    <td class="text-center">{{$entry['date_delivery']}}</td>
+                    <td class="text-center">{{ $loop->iteration }}</td>
+                    <td class="text-center">{{ $entry['delivery_date'] }}</td>
                     <td class="text-left">{{ $entry['user_register'] }}</td>
                     <td class="text-center">{{ $entry['number_note'] }}</td>
-                    <td class="text-center">{{ $entry['approximate_cost'] }}</td>
-                    <td class="text-left">{{ $entry['products'][0]['supplier'] ?? '' }}</td>
-                    <td class="text-center">{{ $entry['products'][0]['invoce_number'] ?? '' }}</td>
-                    <td class="text-center">{{ $entry['products'][0]['object_cost'] ?? '' }}</td>
-                    <td class="text-center">{{ $entry['products'][0]['code'] ?? '' }}</td>
-                    <td class="text-center">{{ $entry['products'][0]['costFinal'] ?? '' }}</td>
-                    <td class="text-center">{{ number_format($ingresos, 2) }}</td>
+                    <td class="text-center">{{ $entry['importe_entregado'] }}</td>
+                    <td class="text-center">{{ $entry['importe_devuelto'] }}</td>
+                    <td class="text-left">-</td>
+                    <td class="text-center">-</td>
+                    <td class="text-left">-</td>
+                    <td class="text-center">-</td>
+                    <td class="text-right">-</td>
+                    <td class="text-right">-</td>
+                    <td class="text-right">{{ $entry['saldo_current'] }}</td>
                 </tr>
-                @foreach($entry['products'] as $index => $product)
-                @if($index > 0)
+                @else
+                @foreach ($products as $idx => $product)
                 <tr>
-                    <td class="text-center"></td>
-                    <td class="text-center"></td>
-                    <td class="text-left"></td>
-                    <td class="text-center"></td>
-                    <td class="text-center"></td>
-                    <td class="text-left">{{ $product['supplier'] }}</td>
-                    <td class="text-center">{{ $product['invoce_number'] }}</td>
-                    <td class="text-center">{{ $product['object_cost'] }}</td>
-                    <td class="text-center">{{ $product['code'] }}</td>
-                    <td class="text-center">{{ $product['costFinal'] }}</td>
-                    <td>---</td>
+                    @if ($idx === 0)
+                    <td class="text-center">{{ $loop->parent->iteration }}</td>
+                    <td class="text-center">{{ $entry['delivery_date'] }}</td>
+                    <td class="text-left">{{ $entry['user_register'] }}</td>
+                    <td class="text-center">{{ $entry['number_note'] }}</td>
+                    <td class="text-center">{{ $entry['importe_entregado'] }}</td>
+                    <td class="text-center">{{ $entry['importe_devuelto'] }}</td>
+                    @else
+                    <td class="text-center" colspan="6"></td>
+                    @endif
+
+                    <td class="text-left">{{ $product['supplier'] ?? '-' }}</td>
+                    <td class="text-center">
+                        {{ $product['invoice_number'] ?? ($product['invoce_number'] ?? '-') }}
+                    </td>
+                    <td class="text-left">{{ $product['description'] ?? '-' }}</td>
+                    <td class="text-center">{{ $product['code'] ?? '-' }}</td>
+
+                    <td class="text-right">{{ $product['ingreso'] }}</td>
+                    <td class="text-right">{{ $product['gasto'] }}</td>
+                    <td class="text-right">{{ $product['saldo'] }}</td>
                 </tr>
+                @endforeach
                 @endif
                 @endforeach
-                @endforeach
             </tbody>
         </table>
-
-        <table class="table-code w-100 m-b-10 uppercase text-xs">
-            <tbody>
-                <tr>
-                    <td class="w-30 text-center bg-grey-darker text-white">Saldo Total Bs.</td>
-                    <td class="w-70 p-l-5"> {{$dataPettyCash['balance']}}</td>
-                </tr>
-            </tbody>
-        </table>
-
     </div>
     <table>
         <tr>

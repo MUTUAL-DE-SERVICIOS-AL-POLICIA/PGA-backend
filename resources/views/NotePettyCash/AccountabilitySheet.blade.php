@@ -6,8 +6,6 @@ $max_requests = 30;
 
 $dns = new DNS2D();
 
-
-
 ?>
 
 <!DOCTYPE html>
@@ -96,32 +94,14 @@ $dns = new DNS2D();
             </th>
             <th class="w-50 align-top">
                 <div class="font-hairline leading-tight text-xs">
-                    <div>MUTUAL DE SERVICIOS AL POLICÍA "MUSERPOL"</div>
-                    <div>DIRECCIÓN DE ASUNTOS ADMINISTRATIVOS</div>
-                    <div>UNIDAD ADMINISTRATIVA</div>
+                    <div>{{$title}}</div>
+                    <div>{{$area}}</div>
                 </div>
-            </th>
-            <th class="w-25 no-padding no-margins align-top">
-                <table class="table-code no-padding no-margins text-xxxs uppercase">
-                    <tbody>
-                        <tr>
-                            <td class="text-center bg-grey-darker text-white">Nº </td>
-                            <td class="text-center text-xxs"> CCH / </td>
-                        </tr>
-                        <tr>
-                            <td class="text-center bg-grey-darker text-white">Fecha</td>
-                            <td class="text-center text-xxs"> {{ $date }} </td>
-                        </tr>
-                    </tbody>
-                </table>
             </th>
         </tr>
     </table>
     <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
-    <div class="block">
-        <div class="leading-tight text-sm text-center m-b-10">DIRECCIÓN DE ASUNTOS ADMINISTRATIVA</div>
-        <div class="leading-tight text-sm text-center m-b-10">{{ $title }}</div>
-    </div>
+
     <table class="table-code w-100 m-b-10 uppercase text-xs">
         <tbody>
             <tr>
@@ -132,10 +112,7 @@ $dns = new DNS2D();
                 <td class="w-40 text-left bg-grey-darker text-white">ÁREA / UNIDAD</td>
                 <td td class="w-60 p-l-5">{{$area}}</td>
             </tr>
-            <tr>
-                <td class="w-40 text-left bg-grey-darker text-white">FECHA DE RECEPCIÓN DE FONDOS</td>
-                <td td class="w-60 p-l-5">{{$date_of_receipt_of_funds}}</td>
-            </tr>
+
             <tr>
                 <td class="w-40 text-left bg-grey-darker text-white">FECHA DE PRESENTACIÓN DE DESCARGOS</td>
                 <td td class="w-60 p-l-5">{{$date_first}}</td>
@@ -159,15 +136,23 @@ $dns = new DNS2D();
             @foreach ($products as $product)
             <tr>
                 <td class="text-center">{{$product['delivery_date']}}</td>
-                <td class="text-center border-left-white">{{ $product['number_invoice'] }}</td>
-                <td class="text-center border-left-white">{{ $product['code'] }}</td>
-                <td class="text-center border-left-white">{{ $product['description'] }}</td>
-                <td class="text-center border-left-white">{{ number_format($product['amount'], 2) }}</td>
+                <td class="text-center">{{$product['invoice_number']}}</td>
+                <td class="text-center">{{$product['code']}}</td>
+                <td class="text-left">{{$product['description']}}</td>
+                <td class="text-right">{{$product['costTotal']}}</td>
             </tr>
             @endforeach
             <tr>
-                <td class="text-left" colspan="4"><strong>VALOR TOTAL BS.</strong></td>
-                <td class="text-center"><strong>{{ number_format($products->sum(function($product) {return $product['amount'];}), 2) }}</strong></td>
+                <td class="text-left" colspan="4"><strong>GASTOS</strong></td>
+                <td class="text-right">{{$grand_total}}</td>
+            </tr>
+            <tr>
+                <td class="text-left" colspan="4"><strong>RETENCIONES</strong></td>
+                <td class="text-right">0.00</td>
+            </tr>
+            <tr>
+                <td class="text-left" colspan="4"><strong>GASTOS + RETENCIONES REALIZADAS POR EL ENCARGADO DE CAJA CHICA</strong></td>
+                <td class="text-right">{{$grand_total}}</td>
             </tr>
         </tbody>
     </table>
@@ -186,17 +171,17 @@ $dns = new DNS2D();
         <tbody class="table-striped">
             <tr>
                 <td class="text-left border-left-white">Importe Total Entregado</td>
-                <td class="text-center border-left-white">{{$fund}}</td>
+                <td class="text-center border-left-white">{{$funds_total_received}}</td>
                 <td class="text-center" rowspan="3"></td>
                 <td class="text-center" rowspan="3"></td>
             </tr>
             <tr>
                 <td class="text-left border-left-white">Importe Total Descargado</td>
-                <td class="text-center border-left-white">{{number_format($products->sum(function($product) {return $product['amount'];}), 2)}}</td>
+                <td class="text-center border-left-white">{{number_format($grand_total, 2)}}</td>
             </tr>
             <tr>
                 <td class="text-left border-left-white">Saldos en efectivo </td>
-                <td class="text-center border-left-white">{{number_format($fund -$products->sum(function($product) {return $product['amount'];}),2)}}</td>
+                <td class="text-center border-left-white">{{$funds_vs_spent_diff}}</td>
             </tr>
         </tbody>
     </table>
@@ -217,7 +202,7 @@ $dns = new DNS2D();
             </tr>
         </thead>
         <tbody class="table-striped">
-            @foreach ($groups_summary as $group)
+            @foreach ($groups as $group)
             <tr>
                 <td class="text-left">{{$group['code']}}</td>
                 <td class="text-left border-left-white">{{ $group['name_group'] }}</td>
@@ -226,10 +211,11 @@ $dns = new DNS2D();
             @endforeach
             <tr>
                 <td class="text-left" colspan="2"><strong>VALOR TOTAL BS.</strong></td>
-                <td class="text-center"><strong>{{ number_format($groups_summary->sum(function($group) {return $group['total_amount'];}), 2) }}</strong></td>
+                <td class="text-center"><strong>{{ number_format($groups->sum(function($group) {return $group['total_amount'];}), 2) }}</strong></td>
             </tr>
         </tbody>
     </table>
+
 
 </body>
 

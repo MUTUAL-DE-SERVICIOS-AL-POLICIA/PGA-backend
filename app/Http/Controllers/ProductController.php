@@ -12,6 +12,7 @@ use App\Models\PettyCash;
 use App\Models\PettyCash_Product;
 use App\Models\Product;
 use App\Models\Ticket;
+use App\Models\TypeCancellation;
 use App\Models\TypePetty;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -25,12 +26,13 @@ class ProductController extends Controller
 
     public function list_petty_cash_user($userId)
     {
+        logger($userId);
         $notes = PettyCash::where('user_register', $userId)
             ->with(['products' => function ($q) {
                 $q->select('products.id', 'description');
             }])
             ->orderByDesc('id')
-            ->get(['id', 'number_note', 'concept', 'request_date', 'delivery_date', 'approximate_cost', 'state', 'comment_recived']);
+            ->get(['id', 'number_note', 'concept', 'request_date', 'delivery_date', 'approximate_cost', 'state', 'comment_recived', 'type_cash_id']);
 
         $data = $notes->map(function ($n) {
             return [
@@ -42,6 +44,7 @@ class ProductController extends Controller
                 'approximate_cost' => $n->approximate_cost,
                 'state' => $n->state,
                 'comment_recived' => $n->comment_recived,
+                'type_cash_id' => $n->type_cash_id,
                 'products' => $n->products->map(function ($p) {
                     return [
                         'description' => $p->description,
@@ -164,67 +167,6 @@ class ProductController extends Controller
         return response()->json($notePettyCash->load('products'), 201);
     }
 
-
-    public function create_note_tickets(Request $request)
-    {
-        logger($request);
-        $request_tickest = DB::selectOne(
-            "SELECT d.description, d.created_at, d.code, e.id, CONCAT(e.first_name, ' ', e.last_name, ' ', e.mothers_last_name) AS full_name
-             FROM public.departures d, public.employees e
-             WHERE d.id = :requestId AND d.employee_id = e.id",
-            ['requestId' => $request->requestId]
-        );
-
-        if ($request_tickest) {
-            $period = Management::latest()->first();
-            $fund = Fund::latest()->first();
-            $lastNoteNumber = PettyCash::max('number_note');
-            $number_note = $lastNoteNumber ? $lastNoteNumber + 1 : 1;
-
-            logger([
-                'number_note' => $number_note,
-                'concept' => "(TRANSPORTE) $request_tickest->description",
-                'approximate_cost' => $request->total,
-                'replacement_cost' => $request->total,
-                'request_date' => today()->toDateString(),
-                'state' => 'En Revision',
-                'user_register' => $request_tickest->id,
-                'management_id' => $period->id,
-                'fund_id' => $fund->id,
-                'type_cash_id' => $request->type
-            ]);
-
-            // $notePettyCash = PettyCash::create([
-            //     'number_note' => $number_note,
-            //     'concept' => $request_tickest->description,
-            //     'approximate_cost' => $request->total,
-            //     'replacement_cost' => $request->total,
-            //     'request_date' => today()->toDateString(),
-            //     'state' => 'En Revision',
-            //     'user_register' => $request_tickest->id,
-            //     'management_id' => $period->id,
-            //     'fund_id' => $fund->id,
-            //     'type_cash_id' => $request->type
-            // ]);
-
-            foreach($request['transfers'] as $trasnfer){
-
-                logger([
-                'from' => $trasnfer['from'],
-                'to' => $trasnfer['to'],
-                'id_permission' => $request->requestId,
-                'state' => "No Cancelado",
-                'ticker_invoice' => $request_tickest->code,
-                'pettycash_id' => 41,
-                'group_id' => 41,
-            ]);
-
-                // $ticket = Ticket::create([
-
-                // ]);
-            }
-        }
-    }
     public function titlePerson($idPersona)
     {
         $ldap = new Ldap();
@@ -241,7 +183,6 @@ class ProductController extends Controller
     {
         $positionName = $this->titlePerson($notepettyCash->user_register);
         $user = User::where('employee_id', $notepettyCash->user_register)->first();
-
         $type = TypePetty::whereId($notepettyCash->type_cash_id)->first();
 
         if ($user) {
@@ -258,11 +199,11 @@ class ProductController extends Controller
             }, 0);
 
             $data = [
-                'title' => 'VALE DE ',
+                'title' => 'VALE DE CAJA CHICA',
                 'subtitle' => $type->description,
                 'code' => $type->code,
                 'number_note' => $notepettyCash->number_note,
-                'date' => Carbon::now()->format('Y'),
+                'date' => $notepettyCash->request_date,
                 'employee' => $employee
                     ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}"
                     : null,
@@ -271,6 +212,7 @@ class ProductController extends Controller
                 'concept' => $notepettyCash->concept,
                 'total' => $totalDesembolso,
                 'total_lit' => $this->numero_a_letras($totalDesembolso),
+                'type' => $notepettyCash->type_cash_id,
             ];
 
             $pdf = Pdf::loadView('NotePettyCash.NotePettyCash', $data);
@@ -291,11 +233,11 @@ class ProductController extends Controller
                 }, 0);
 
                 $data = [
-                    'title' => 'VALE DE ',
+                    'title' => 'VALE DE CAJA CHICA',
                     'subtitle' => $type->description,
                     'code' => $type->code,
                     'number_note' => $notepettyCash->number_note,
-                    'date' => Carbon::now()->format('Y'),
+                    'date' => $notepettyCash->request_date,
                     'employee' => $employee
                         ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}"
                         : null,
@@ -304,9 +246,87 @@ class ProductController extends Controller
                     'concept' => $notepettyCash->concept,
                     'total' => $totalDesembolso,
                     'total_lit' => $this->numero_a_letras($totalDesembolso),
+                    'type' => $notepettyCash->type_cash_id,
                 ];
 
                 $pdf = Pdf::loadView('NotePettyCash.NotePettyCash', $data);
+                return $pdf->download('Vale_caja_chica.pdf');
+            }
+        }
+    }
+
+    public function print_Petty_Cash_Trasnport(PettyCash $notepettyCash)
+    {
+        $positionName = $this->titlePerson($notepettyCash->user_register);
+        $user = User::where('employee_id', $notepettyCash->user_register)->first();
+        $type = TypePetty::whereId($notepettyCash->type_cash_id)->first();
+        if ($user) {
+            $employee = Employee::find($notepettyCash->user_register);
+            $routes = $notepettyCash->tickets()
+                ->get()
+                ->map(fn($t) => [
+                    'from' => $t->from,
+                    'to' => $t->to,
+                    'ticket_invoice' => $t->ticket_invoice,
+                    'cost' => $t->cost,
+                ]);
+
+            $totalDesembolso = $routes->reduce(function ($carry, $route) {
+                return $carry + ($route['cost']);
+            }, 0);
+
+            $data = [
+                'title' => 'VALE DE CAJA CHICA',
+                'subtitle' => $type->description,
+                'code' => $type->code,
+                'number_note' => $notepettyCash->number_note,
+                'date' => $notepettyCash->request_date,
+                'employee' => $employee
+                    ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}"
+                    : null,
+                'position' => $positionName,
+                'routes' => $routes,
+                'concept' => $notepettyCash->concept,
+                'total' => $totalDesembolso,
+                'total_lit' => $this->numero_a_letras($totalDesembolso),
+            ];
+
+            $pdf = Pdf::loadView('NotePettyCash.NotePettyCashFormTrans', $data);
+            return $pdf->download('Vale_caja_chica.pdf');
+        } else {
+            $employee = Employee::where('id', $notepettyCash->user_register)->first();
+            if ($employee) {
+                $employee = Employee::find($notepettyCash->user_register);
+                $routes = $notepettyCash->tickets()
+                    ->get()
+                    ->map(fn($t) => [
+                        'from' => $t->from,
+                        'to' => $t->to,
+                        'ticket_invoice' => $t->ticket_invoice,
+                        'cost' => $t->cost,
+                    ]);
+
+                $totalDesembolso = $routes->reduce(function ($carry, $route) {
+                    return $carry + ($route['cost']);
+                }, 0);
+
+                $data = [
+                    'title' => 'VALE DE CAJA CHICA',
+                    'subtitle' => $type->description,
+                    'code' => $type->code,
+                    'number_note' => $notepettyCash->number_note,
+                    'date' => $notepettyCash->request_date,
+                    'employee' => $employee
+                        ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}"
+                        : null,
+                    'position' => $positionName,
+                    'routes' => $routes,
+                    'concept' => $notepettyCash->concept,
+                    'total' => $totalDesembolso,
+                    'total_lit' => $this->numero_a_letras($totalDesembolso),
+                ];
+
+                $pdf = Pdf::loadView('NotePettyCash.NotePettyCashFormTrans', $data);
                 return $pdf->download('Vale_caja_chica.pdf');
             }
         }
@@ -364,9 +384,22 @@ class ProductController extends Controller
         return $groups;
     }
 
+    public function list_types_cancellations()
+    {
+        $types = TypeCancellation::all()->map(function ($type) {
+            return [
+                'id' => $type->id,
+                'description' => $type->description
+            ];
+        });
+
+        return $types;
+    }
+
     public function save_petty_cash(Request $request)
     {
         try {
+            logger($request);
             $fund = Fund::latest()->first();
             $pettyCash = PettyCash::find($request['requestId']);
 
@@ -527,7 +560,7 @@ class ProductController extends Controller
         return $pdf->download('Vale_caja_chica_form_2.pdf');
     }
 
-    private function numero_a_letras($numero)
+    public static function numero_a_letras($numero)
     {
         $formatter = new NumberFormatter("es", NumberFormatter::SPELLOUT);
 
@@ -541,5 +574,11 @@ class ProductController extends Controller
         $literal .= " con " . str_pad($decimal, 2, "0", STR_PAD_RIGHT) . "/100";
 
         return $literal;
+    }
+
+    public function listPermission(Request $request)
+    {
+        logger($request->id);
+        $permission = DB::select();
     }
 }

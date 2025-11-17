@@ -22,11 +22,34 @@ class SeedTypeCashes extends Command
      */
     public function handle()
     {
-        $records = [
-            ['description' => 'Caja Chica', 'code' => 'CCH'],
-            ['description' => 'Reposición', 'code' => 'REP'],
-            ['description' => 'Transporte Personal', 'code' => 'TRP'],
+        $records_cancellations = [
+            ['description' => 'Anular por el llenado incorrecto del formulario.'],
+            ['description' => 'Anular por tiempo excedido.'],
+            ['description' => 'Anular por que supero los recursos entregados.'],
         ];
+
+        $records = [
+            ['description' => 'SOLICITUD DE RECURSOS', 'code' => 'CCH'],
+            ['description' => 'REEMBOLSO DE GASTO', 'code' => 'REG'],
+            ['description' => 'GASTO POR TRANSPORTE', 'code' => 'TRP'],
+        ];
+
+        foreach ($records_cancellations as $record) {
+            $exists = DB::table('reason_for_cancellations')
+                ->where('description', $record['description'])
+                ->exists();
+
+            if (!$exists) {
+                DB::table('reason_for_cancellations')->insert([
+                    'description' => $record['description'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $this->line("Insertado: {$record['description']}");
+            } else {
+                $this->warn("Ya existe: {$record['description']}");
+            }
+        }
 
         foreach ($records as $record) {
             $exists = DB::table('type_cashes')

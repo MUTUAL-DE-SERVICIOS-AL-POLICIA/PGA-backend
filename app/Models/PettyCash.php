@@ -31,12 +31,23 @@ class PettyCash extends Model
         return $this->belongsTo(Fund::class, 'fund_id');
     }
 
-    public function TypeCashes()
+    public function typeCashes()
     {
         return $this->belongsTo(TypePetty::class);
     }
 
-    public function Tickets(){
-        return $this->hasMany(Ticket::class);
+    public function typeCancellations()
+    {
+        return $this->belongsTo(TypeCancellation::class);
+    }
+
+    // public function tickets()
+    // {
+    //     return $this->belongsToMany(Ticket::class, 'tickets', 'petty_cash_id', 'id_permission')->withPivot('from', 'to', 'cost', 'ticket_invoice', 'group_id')->withTimestamps();
+    // }
+
+    public function tickets()
+    {
+        return $this->hasMany(Ticket::class, 'pettycash_id', 'id');
     }
 }

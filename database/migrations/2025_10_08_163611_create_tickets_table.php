@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -16,14 +17,20 @@ return new class extends Migration
             $table->string('from');
             $table->string('to');
             $table->decimal('cost', 10, 2)->default(0.00);
-            $table->integer('id_permission');
-            $table->string('state');
+            $table->foreignId('id_permission')->constrained('public.departures')->onDelete('restrict')->onUpdate('cascade');
             $table->string('ticket_invoice');
+            $table->date('permission_day');
             $table->foreignId('pettycash_id')->constrained('petty_cashes')->onUpdate('cascade')->onDelete('restrict');
             $table->foreignId('group_id')->nullable()->constrained('groups')->onUpdate('cascade')->onDelete('restrict');
             $table->timestamps();
             $table->softDeletes();
         });
+
+        Schema::table('funds', function (Blueprint $table){
+            $table->string('type')->nullable();
+        });
+        
+        DB::statement('ALTER TABLE funds ALTER COLUMN reception_date DROP NOT NULL;');
     }
 
     /**
@@ -32,5 +39,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('tickets');
+
+         Schema::table('funds', function (Blueprint $table) {
+            $table->dropColumn('type');
+        });
     }
 };
