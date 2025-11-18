@@ -9,14 +9,11 @@ use App\Models\Group;
 use App\Models\Management;
 use App\Models\Material;
 use App\Models\PettyCash;
-use App\Models\PettyCash_Product;
 use App\Models\Product;
-use App\Models\Ticket;
 use App\Models\TypeCancellation;
 use App\Models\TypePetty;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use NumberFormatter;
@@ -26,7 +23,6 @@ class ProductController extends Controller
 
     public function list_petty_cash_user($userId)
     {
-        logger($userId);
         $notes = PettyCash::where('user_register', $userId)
             ->with(['products' => function ($q) {
                 $q->select('products.id', 'description');
@@ -58,6 +54,16 @@ class ProductController extends Controller
         return response()->json($data);
     }
 
+    public static function disableFunds()
+    {
+        $fund = Fund::where('type', 'ASIGNACIÓN DE FONDOS DE CAJA CHICA')
+            ->latest()
+            ->first();
+        if ($fund && $fund->received_amount == 0 && $fund->current_amount == 0 && is_null($fund->reception_date)) {
+            return true;
+        }
+        return false;
+    }
 
     public function list_petty_cash()
     {
@@ -550,7 +556,7 @@ class ProductController extends Controller
             'subtitle' => $type->description,
             'code' => $type->code,
             'number_note' => $notepettyCash->number_note,
-            'date' => Carbon::now()->format('Y'),
+            'date' => $notepettyCash->delivery_date,
             'request_date' => $requests_date,
             'concept' => $notepettyCash->concept,
             'products' => $products,

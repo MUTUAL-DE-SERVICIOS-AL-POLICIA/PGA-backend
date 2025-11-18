@@ -22,7 +22,14 @@ class PettycashController extends Controller
 {
     public function Accountability_sheet()
     {
+
+        $fund = Fund::where('type', 'ASIGNACIÓN DE FONDOS DE CAJA CHICA')
+            ->whereNotNull('reception_date')
+            ->orderBy('id', 'desc')
+            ->first(['id']);
+
         $pettyCashes = PettyCash::where('state', 'Finalizado')
+            ->where('fund_id', '>=', $fund->id)
             ->with([
                 'products' => function ($q) {
                     $q->select('products.id', 'products.description', 'products.group_id', 'products.cost_object');
@@ -48,6 +55,7 @@ class PettycashController extends Controller
         })->values();
 
         $pettyCashTickets = PettyCash::where('state', 'Finalizado')
+            ->where('fund_id', '>=', $fund->id)
             ->whereHas('tickets')
             ->with([
                 'tickets' => function ($q) {
@@ -85,7 +93,7 @@ class PettycashController extends Controller
         });
         $grandTotalFormatted = number_format($grandTotal, 2, '.', '');
 
-        $funds = Fund::whereNotNull('reception_date')->get();
+        $funds = Fund::whereNotNull('reception_date')->where('id', '>=', $fund->id)->get();
 
         $fundsTotalReceived = $funds->sum(function ($f) {
             return (float) str_replace([','], [''], $f->received_amount);
@@ -144,13 +152,14 @@ class PettycashController extends Controller
             $pettyCashesQuery->whereDate('delivery_date', '<=', $end);
         }
 
-        $pettyCashes = $pettyCashesQuery->get(['id', 'number_note', 'delivery_date']);
+        $pettyCashes = $pettyCashesQuery->get(['id', 'number_note', 'delivery_date', 'updated_at']);
 
         $allProducts = $pettyCashes->flatMap(function ($pc) {
             return $pc->products->map(function ($product) use ($pc) {
                 return [
                     'number_note' => $pc->number_note,
                     'delivery_date' => $pc->delivery_date,
+                    'updated_at' => $pc->updated_at,
                     'id' => $product->id,
                     'description' => $product->description,
                     'code' => optional($product->group)->code,
@@ -178,13 +187,14 @@ class PettycashController extends Controller
             $pettyCashesQuery->whereDate('delivery_date', '<=', $end);
         }
 
-        $pettyCashTickets = $pettyCashesQuery->get(['id', 'number_note', 'delivery_date']);
+        $pettyCashTickets = $pettyCashesQuery->get(['id', 'number_note', 'delivery_date', 'updated_at']);
 
         $allTickets = $pettyCashTickets->flatMap(function ($pc) {
             return $pc->tickets->map(function ($ticket) use ($pc) {
                 return [
                     'number_note' => $pc->number_note,
                     'delivery_date' => $pc->delivery_date,
+                    'updated_at' => $pc->updated_at,
                     'id' => $ticket->id,
                     'description' => 'TRANSPORTE DEL PERSONAL',
                     'code' => '22600',
@@ -199,7 +209,7 @@ class PettycashController extends Controller
         $combined = $allProducts
             ->concat($allTickets)
             ->sortBy(function ($item) {
-                return $item['delivery_date'];
+                return $item['updated_at'];
             })
             ->values();
 
@@ -248,6 +258,7 @@ class PettycashController extends Controller
                 'total_amount' => $groupedProducts->sum('costTotal'),
             ];
         });
+
         $fundConfig = Fund::latest()->first();
         $fundConfig->discharge_date = today()->toDateString();
         $fundConfig->current_amount = $grandTotalFormatted;
@@ -363,12 +374,19 @@ class PettycashController extends Controller
             }
         };
 
+        $fund = Fund::where('type', 'ASIGNACIÓN DE FONDOS DE CAJA CHICA')
+            ->whereNotNull('reception_date')
+            ->orderBy('id', 'desc')
+            ->first(['id']);
+
         $pettyCashes = PettyCash::where('state', 'Finalizado')
             ->whereHas('products')
+            ->where('fund_id', '>=', $fund->id)
             ->with(['products' => function ($query) {
                 $query->select('products.id', 'description', 'group_id', 'cost_object');
             }])
             ->get(['id', 'user_register', 'number_note', 'approximate_cost', 'replacement_cost', 'delivery_date', 'updated_at']);
+
 
         $formatted = $pettyCashes->map(function ($pettyCash) use ($toFloat, $nf) {
             $employee = Employee::find($pettyCash->user_register);
@@ -405,6 +423,7 @@ class PettycashController extends Controller
         });
 
         $pettyCashTickets = PettyCash::where('state', 'Finalizado')
+            ->where('fund_id', '>=', $fund->id)
             ->whereHas('tickets')
             ->with(['tickets' => function ($q) {
                 $q->select('id', 'pettycash_id', 'from', 'to', 'cost', 'id_permission', 'ticket_invoice', 'permission_day');
@@ -437,7 +456,7 @@ class PettycashController extends Controller
             ];
         });
 
-        $funds = Fund::whereNotNull('reception_date')->get();
+        $funds = Fund::whereNotNull('reception_date')->where('id', '>=', $fund->id)->get();
 
         $fundEntries = $funds->map(function ($f) use ($toFloat, $nf) {
             return [
@@ -573,6 +592,8 @@ class PettycashController extends Controller
 
         $percent_discharges_vs_designation = 100 - $percent_balance_vs_designation;
 
+        $disabledEndManagement = ProductController::disableFunds();
+
         $dataPettyCash = [
             'date' => Carbon::now()->format('Y-m-d'),
             'name_responsibility' => 'WILLIAM ITURRALDE',
@@ -582,6 +603,7 @@ class PettycashController extends Controller
             'amount_replacement' => $fund->received_amount,
             'designation' => $designation,
             'has_no_reception_date' => $has_no_reception_date,
+            'disabledEndManagement' => $disabledEndManagement,
             'percentages' => [
                 'discharges' => round($percent_discharges, 2),
                 'balance' => round($percent_balance, 2),
@@ -595,7 +617,6 @@ class PettycashController extends Controller
             'dataPettyCash' => $dataPettyCash,
         ]);
     }
-
 
     public function PaymentOrder(Request $request)
     {
@@ -612,8 +633,8 @@ class PettycashController extends Controller
             'amount' => $grand_total,
             'amount_literal' => $number_literal,
             'responsible' => $fund->name_responsible,
-            'routeSheet'=> $request->routeSheet
-            
+            'routeSheet' => $request->routeSheet
+
         ];
 
         $pdf = Pdf::loadView('NotePettyCash.PaymentOrder', $data);
@@ -888,5 +909,65 @@ class PettycashController extends Controller
                 'message' => 'Solicitud guardada correctamente'
             ], 200);
         });
+    }
+
+    public function getFunds()
+    {
+        $lastAssignment = Fund::where('type', 'ASIGNACIÓN DE FONDOS DE CAJA CHICA')
+            ->orderBy('id', 'desc')
+            ->first();
+
+
+        if (!$lastAssignment) {
+            return response()->json([
+                'message' => 'No existe ninguna Asignacion de recursos registrada.'
+            ], 404);
+        }
+
+        $listFunds = Fund::where('id', '>=', $lastAssignment->id)
+            ->orderBy('id', 'asc')
+            ->get();
+
+        return response()->json([
+            'data' => $listFunds
+        ]);
+    }
+
+    public function EndManagement(Request $request)
+    {
+        $fundConfig = Fund::latest()->first();
+        $fundConfig->discharge_date = today()->toDateString();
+        $fundConfig->current_amount = $request->discharges;
+        $fundConfig->save();
+
+        $endFundManagement = Fund::create([
+            'received_amount' => 0,
+            'current_amount' => 0,
+            'name_responsible' => 'WILLIAM ITURRALDE QUISBERT',
+            'username_responsible' => 'witurralde',
+            'type' => 'ASIGNACIÓN DE FONDOS DE CAJA CHICA',
+        ]);
+
+        return response()->json([
+            'dataPettyCash' => $endFundManagement,
+            'status' => true,
+            'message' => "Llenar los datos cuando quiera iniciar la gestión"
+        ], 200);
+    }
+
+    public function NewManagementPettyCash(Request $request)
+    {
+        $fundConfig = Fund::latest()->first();
+        $fundConfig->reception_date = today()->toDateString();
+        $fundConfig->received_amount = $request->assignmentAmount;
+        $fundConfig->current_amount = $request->assignmentAmount;
+        $fundConfig->name_responsible = $request->responsible;
+        $fundConfig->save();
+
+        return response()->json([
+            'fund' => $fundConfig,
+            'status' => true,
+            'message' => "Inicio de Gesión Exitoso"
+        ], 200);
     }
 }

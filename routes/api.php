@@ -48,6 +48,7 @@ Route::group([
     Route::get('/printRequest/{note_request}', [NoteRequestController::class, 'print_request']);
     Route::get('/materialCorrect', [MaterialController::class, 'NameMaterialCorrect']);
     Route::get('/listPermission', [ProductController::class, 'listPermission']);
+    Route::get('/disableFunds', [ProductController::class, 'disableFunds']);
 
     Route::group(['middleware' => ['auth:sanctum']], function () {
 
@@ -101,7 +102,7 @@ Route::group([
         Route::get('/listEmployeesRequest', [UserLdapController::class, 'list_user_request']);
         Route::get('/listRequestDirections/{direction}', [UserLdapController::class, 'list_users_direction']);
         Route::get('/printListRequestDirections/{direction}', [UserLdapController::class, 'list_direction_print']);
-        
+
         Route::get('/AccountabilitySheet', [PettycashController::class, 'Print_Accountability_sheet']);
         Route::get('/RecordBook', [PettycashController::class, 'Petty_Cash_Record_Book']);
         Route::get('/PrintRecordBook', [PettycashController::class, 'Print_Petty_Cash_Record_Book']);
@@ -117,6 +118,11 @@ Route::group([
         Route::post('/postDeliveyOfResources', [PettycashController::class, 'postDeliveyOfResources']);
 
         Route::get('list_types_cancellations', [ProductController::class, 'list_types_cancellations']);
+
+        Route::get('list_funds', [PettycashController::class, 'getFunds']);
+
+        Route::post('endManagement', [PettycashController::class, 'EndManagement']);
+        Route::post('NewManagementPettyCash', [PettycashController::class, 'NewManagementPettyCash']);
 
         Route::get('/php-config', function () {
             return response()->json([
