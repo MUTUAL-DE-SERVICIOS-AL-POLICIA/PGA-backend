@@ -1141,6 +1141,7 @@ class PettycashController extends Controller
             'cost' => $request->assignmentAmount,
             'date' => today()->toDateString(),
             'fund_id' => $fundConfig->id,
+            'incomes' => $request->assignmentAmount,
             'total' => $request->assignmentAmount,
         ]);
 

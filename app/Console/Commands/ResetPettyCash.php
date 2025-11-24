@@ -16,6 +16,7 @@ class ResetPettyCash extends Command
 
         try {
             DB::statement('TRUNCATE TABLE petty_cash_products, petty_cashes RESTART IDENTITY CASCADE;');
+            DB::statement('TRUNCATE TABLE funds RESTART IDENTITY CASCADE;');
 
             $this->line("✓ Tablas limpiadas y secuencias reiniciadas a 1.");
             $this->info("Proceso completado con éxito.");
