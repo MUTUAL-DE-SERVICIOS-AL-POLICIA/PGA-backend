@@ -6,97 +6,6 @@ $max_requests = 7;
 
 $dns = new DNS2D();
 
-function convertirNumeroALetras($numero)
-{
-    $unidades = [
-        '',
-        'uno',
-        'dos',
-        'tres',
-        'cuatro',
-        'cinco',
-        'seis',
-        'siete',
-        'ocho',
-        'nueve',
-        'diez',
-        'once',
-        'doce',
-        'trece',
-        'catorce',
-        'quince',
-        'dieciséis',
-        'diecisiete',
-        'dieciocho',
-        'diecinueve'
-    ];
-    $decenas = [
-        '',
-        '',
-        'veinte',
-        'treinta',
-        'cuarenta',
-        'cincuenta',
-        'sesenta',
-        'setenta',
-        'ochenta',
-        'noventa'
-    ];
-    $centenas = [
-        '',
-        'ciento',
-        'doscientos',
-        'trescientos',
-        'cuatrocientos',
-        'quinientos',
-        'seiscientos',
-        'setecientos',
-        'ochocientos',
-        'novecientos'
-    ];
-
-    if ($numero == 0) {
-        return 'cero';
-    }
-
-    if ($numero < 20) {
-        return $unidades[$numero];
-    }
-
-    if ($numero < 100) {
-        $decena = intval($numero / 10);
-        $unidad = $numero % 10;
-        return $unidad == 0 ? $decenas[$decena] : $decenas[$decena] . ' y ' . $unidades[$unidad];
-    }
-
-    if ($numero < 1000) {
-        $centena = intval($numero / 100);
-        $resto = $numero % 100;
-        if ($numero == 100) {
-            return 'cien';
-        }
-        return $centenas[$centena] . ($resto > 0 ? ' ' . convertirNumeroALetras($resto) : '');
-    }
-
-    if ($numero < 1000000) {
-        $miles = intval($numero / 1000);
-        $resto = $numero % 1000;
-        $textoMiles = $miles == 1 ? 'mil' : convertirNumeroALetras($miles) . ' mil';
-        return $resto > 0 ? $textoMiles . ' ' . convertirNumeroALetras($resto) : $textoMiles;
-    }
-
-    if ($numero < 1000000000) {
-        $millones = intval($numero / 1000000);
-        $resto = $numero % 1000000;
-        $textoMillones = $millones == 1 ? 'un millón' : convertirNumeroALetras($millones) . ' millones';
-        return $resto > 0 ? $textoMillones . ' ' . convertirNumeroALetras($resto) : $textoMillones;
-    }
-
-    return 'Número demasiado grande';
-}
-
-$total_literal = convertirNumeroALetras($amount);
-
 ?>
 
 <!DOCTYPE html>
@@ -185,27 +94,25 @@ $total_literal = convertirNumeroALetras($amount);
             </th>
             <th class="w-50 align-top">
                 <div class="font-hairline leading-tight text-xs">
-                    <div>MUTUAL DE SERVICIOS AL POLICÍA "MUSERPOL"</div>
-                    <div>DIRECCIÓN DE ASUNTOS ADMINISTRATIVOS</div>
-                    <div>UNIDAD ADMINISTRATIVA</div>
+                    <div>ESTADO PLURINACIONAL DE BOLIVIA</div>
+                    <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
+                    <div>MUTUAL DE SERVICIOS AL POLICIA</div>
                 </div>
             </th>
-            <th class="w-25 no-padding no-margins align-top">
-                <table class="table-code no-padding no-margins text-xxxs uppercase">
-                    <tbody>
-                        <tr>
-                            <td class="text-center bg-grey-darker text-white">Nº </td>
-                            <td class="text-center text-xxs"> CCH / {{ $number_note }} </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <th class="w-25 text-left no-paddings no-margins align-middle">
+                <div class="text-left">
+                    <img src="{{ public_path("/img/logo.png") }}" class="w-40">
+                </div>
             </th>
         </tr>
     </table>
     <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
     <div class="block">
         <div class="leading-tight text-sm text-center m-b-10"><strong>{{ $title }}</strong></div>
+        <div class="leading-tight text-sm text-center m-b-10">{{$routeSheet}}</div>
     </div>
+
+    <div class="leading-tight text-sm text-right m-b-10">La Paz, {{$date_send}}</div>
 
     <div class="leading-tight text-sm text-left m-b-10" style="text-align: justify;">
         En cumplimiento a los Artículos 1 y 14 de la Ley 1178, en esta Unidad se realizó la revisión del presente tramite, adjuntando documentación suficiente, pertinente y competente como respaldo, por lo que solicitamos proceder al pago a través de la Unidad Financiera dependiente de la Dirección de Asuntos Administrativos.
@@ -221,9 +128,13 @@ $total_literal = convertirNumeroALetras($amount);
         </thead>
         <tbody class="table-striped">
             <tr>
-                <td class="text-center">{{1}}</td>
+                <td class="text-center">{{1}}</td>  
                 <td class="text-center">{{$responsible}}</td>
                 <td class="text-center">{{$amount}}</td>
+            </tr>
+            <tr>
+                <td class="text-center">Total: </td>
+                <td class="text-center" colspan="2"><strong>{{$amount_literal}}</strong></td>
             </tr>
         </tbody>
     </table>
@@ -234,9 +145,11 @@ $total_literal = convertirNumeroALetras($amount);
     <div class="leading-tight text-sm text-left m-b-10" style="text-align: justify;">
         Descargo de gastos realizados con fondos de Caja Chica de la MUSERPOL, previa revisión será reembolsado conforme al Reglamento Interno para el efecto.
     </div>
+
     <div class="leading-tight text-sm text-left m-b-10" style="text-align: justify;">
-        Correspondiente: Del {{$date_recived}} al {{$date_send}}.
+        Correspondiente: Colocar fechas de intervalo 
     </div>
+
 
     <div class="leading-tight text-sm text-left m-b-10">
         <strong>COMO RESPALDO AL PRESENTE PAGO, SE ANEXA LA SIGUIENTE DOCUMENTACIÓN:</strong>
@@ -272,7 +185,7 @@ $total_literal = convertirNumeroALetras($amount);
             <tr>
                 <td rowspan="3" style="height: 80px;"></td>
                 <td rowspan="3" style="height: 80px;"></td>
-                <td rowspan="3" style="height: 80px;"doce></td>
+                <td rowspan="3" style="height: 80px;" doce></td>
             </tr>
         </tbody>
     </table>

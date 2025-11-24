@@ -333,8 +333,6 @@ class ReportController extends Controller
                 'importe_salida' => round($totalImporteSalida, 2),
                 'importe_saldo' => round($totalImporteSaldo, 2),
             ];
-
-            // Download Excel file
             return Excel::download(new KardexExport($kardex, $totales), 'Kardex_Existencias.xlsx');
         } catch (\Exception $e) {
             logger($e->getMessage());

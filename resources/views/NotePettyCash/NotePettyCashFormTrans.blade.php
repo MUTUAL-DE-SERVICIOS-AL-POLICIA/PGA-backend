@@ -2,10 +2,9 @@
 
 use \Milon\Barcode\DNS2D;
 
-$max_requests = 7;
+$max_requests = 10;
 
 $dns = new DNS2D();
-
 
 ?>
 
@@ -23,7 +22,8 @@ $dns = new DNS2D();
         }
 
         body {
-            font-size: 12px;
+            font-size: 10px;
+            /* Cambia según sea necesario */
         }
 
         .scissors-rule {
@@ -66,15 +66,15 @@ $dns = new DNS2D();
         }
 
         .p-l-5 {
-            padding-left: 5px;
+            padding-left: 3px;
         }
 
         .text-xs {
-            font-size: 10px;
+            font-size: 8px;
         }
 
         .text-xxxs {
-            font-size: 8px;
+            font-size: 6px;
         }
 
         .table-large-font {
@@ -96,8 +96,9 @@ $dns = new DNS2D();
             </th>
             <th class="w-50 align-top">
                 <div class="font-hairline leading-tight text-xs">
-                    <div>FORMULARIO N° 4</div>
-                    <div>{{$title}}</div>
+                    <div>FORMULARIO N° 1</div>
+                    <div>VALE DE CAJA CHICA</div>
+                    <div>{{$subtitle}}</div>
                 </div>
             </th>
             <th class="w-25 no-padding no-margins align-top">
@@ -117,98 +118,81 @@ $dns = new DNS2D();
         </tr>
         </table>
         <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
-
-        <div class="leading-tight text-sm text-left m-b-10">
-            <strong>POR CONCEPTO:</strong> {{$concept}}
+        <div class="leading-tight text-left">
+            <strong>DESEMBOLSO:</strong>
+        </div>
+        <div class="leading-tight text-xs text-left">
+            He recibido del Responsable de Caja Chica con cargo a rendición de cuenta documentada, la suma de:
+        </div>
+        <table class="table-code w-100 m-b-10 uppercase ">
+            <tbody>
+                <tr>
+                    <td class="w-75 p-l-5 table-large-font">{{ number_format($total, 2) }} Bs.</td>
+                </tr>
+                <tr>
+                    <td class="w-75 p-l-5 table-large-font">{{ $total_lit }}</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="leading-tight  text-left ">
+            <strong>POR CONCEPTO: {{$concept}}</strong>
         </div>
         <table class="table-info w-100 m-b-10 uppercase text-xs">
             <thead>
                 <tr>
                     <th class="text-center bg-grey-darker text-white">ITEM</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">PROVEEDOR</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">FECHA</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">N° DE FACTURA</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">PARTIDA PRESUPUESTARIA</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">CANTIDAD</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">PRECIO UNIT</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">TOTAL (BS)</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">N° BOLETA</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">DESDE</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">HASTA</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">IMPORTE</th>
                 </tr>
             </thead>
             <tbody class="table-striped">
-                @foreach ($products as $i => $product)
+                @foreach ($routes as $i => $route)
                 <tr>
                     <td class="text-center">{{ ++$i }}</td>
-                    <td class="text-center">{{ $product['supplier'] }}</td>
-                    <td class="text-center">{{ $request_date }}</td>
-                    <td class="text-center">{{ $product['number_invoice'] }}</td>
-                    <td class="text-center">{{ $product['code_group'] }}</td>
-                    <td class="text-center">{{ $product['quantity'] }}</td>
-                    <td class="text-center">{{ $product['price'] }}</td>
-                    <td class="text-right">{{ number_format($product['total'], 2)}}</td>
+                    <td class="text-center">{{ $route['ticket_invoice'] }}</td>
+                    <td class="text-center">{{ $route['from'] }}</td>
+                    <td class="text-center">{{ $route['to'] }}</td>
+                    <td class="text-right">{{ $route['cost'] }}</td>
                 </tr>
                 @endforeach
-                @for($i = sizeof($products) + 1; $i <= $max_requests; $i++)
+                @for($i = sizeof($routes) + 1; $i <= $max_requests; $i++)
                     <tr>
-                    <td class="text-center" colspan="8">&nbsp;</td>
+                    <td class="text-center" colspan="7">&nbsp;</td>
                     </tr>
                     @endfor
-
                     <tr>
-                        <td class="text-left" colspan="7"><strong>VALOR TOTAL DE COMPRA DEL BIEN O SERVICIO EN BS.</strong></td>
-                        <td class="text-right"><strong>{{ number_format($products->sum(function($product) {return $product['total'];}), 2) }}</strong></td>
-                    </tr>
-                    <tr>
-                        <td class="text-center" colspan="8">&nbsp;</td>
-                    </tr>
-                    <tr>
-                        <td class="text-left" colspan="7"><strong>SALDO A DEVOLVER EN BS.</strong></td>
-                        <td class="text-right">
-                            <strong>
-                                {{
-                number_format(
-                    $total_petty_cash - $products->sum(function($product) { return $product['total']; }),
-                    2
-                )
-            }}
-                            </strong>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="text-center" colspan="8">&nbsp;</td>
-                    </tr>
-                    <tr>
-                        <td class="text-left" colspan="7"><strong>VALOR ENTREGADO EN BS.</strong></td>
-                        <td class="text-right"><strong>{{ $total_petty_cash }}</strong></td>
+                        <td class="text-center" colspan="4"><strong>TOTAL</strong></td>
+                        <td class="text-right"><strong>{{ number_format($total, 2) }}</strong></td>
                     </tr>
             </tbody>
         </table>
-        <br />
-        <div class="leading-tight text-sm text-left m-b-10">
+        <div class="leading-tight text-left m-b-10">
+            El reembolso por gasto de transporte será previa presentación del formulario adjuntando la boleta de comisión en original.
+        </div>
+        <div class="leading-tight text-left m-b-10">
+            <strong>COMPROMISO:</strong>
+        </div>
+        <div class="leading-tight text-left m-b-10" style="text-align: justify;">
+            En sujeción al inciso c) del artículo 27 de la Ley 1178 del 20 de julio de 1990 de Administración y Control Gubernamentales
+            (SAFCO), me comprometo a presentar la documentación sustentatoria original, auténtica y fidedigna <strong><u>en
+                    el plazo máximo de 5 dias hábiles de la fecha de la boleta de comisión.</u></strong>
+        </div>
+        
+        <div class="leading-tight text-left m-b-10">
             <strong>Lugar y Fecha:</strong> ________________________________________
         </div>
-        <br />
-
-        <table class="w-100 text-sm uppercase" style="width: 100%; margin-top: 10px;">
-            <tr>
-                <td class="text-center" style="width: 50%; vertical-align: top;">
-                    <br /><br />
-                    ____________________________
-                    <br />
-                    <strong>Entregué Conforme: </strong>
-                    <br /><br />
-                    
-                </td>
-                <td class="text-center" style="width: 50%; vertical-align: top;">
-                    <br /><br />
-                    ____________________________
-                    <br />
-                    <strong>Recibí Conforme:</strong>
-                    <br /><br />
-    
-                </td>
-            </tr>
+        <table class="w-100" style="margin-top: 50px;">
+            <tbody>
+                <tr class="align-bottom text-center text-xxxs" style="height: 120px; vertical-align: bottom;">
+                    <td class="rounded w-33">&nbsp;Solicitado por:</td>
+                    <td class="rounded w-33">&nbsp;Autorizado por:</td>
+                    <td class="rounded w-33">&nbsp;Visto Bueno</td>
+                    <td class="rounded w-33">&nbsp;Entregué Conforme</td>
+                </tr>
+            </tbody>
         </table>
-
         @if($it == 0)
         <div class="scissors-rule">
             <span>------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------</span>
