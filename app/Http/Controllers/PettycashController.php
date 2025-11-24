@@ -10,6 +10,7 @@ use App\Models\Group;
 use App\Models\Management;
 use App\Models\PettyCash;
 use App\Models\Product;
+use App\Models\RecordBook;
 use App\Models\Ticket;
 use App\Models\TypeCancellation;
 use App\Models\User;
@@ -264,14 +265,6 @@ class PettycashController extends Controller
         $fundConfig->current_amount = $grandTotalFormatted;
         $fundConfig->save();
 
-        Fund::create([
-            'received_amount' => $grandTotalFormatted,
-            'current_amount' => $grandTotalFormatted,
-            'name_responsible' => 'WILLIAM ITURRALDE QUISBERT',
-            'username_responsible' => 'witurralde',
-            'type' => 'REPOSICIÓN DE FONDOS',
-        ]);
-
         $data = [
             'title' => 'PLANILLA DE RENDICIÓN DE CUENTAS',
             'date' => Carbon::now()->format('Y'),
@@ -456,9 +449,35 @@ class PettycashController extends Controller
             ];
         });
 
-        $funds = Fund::whereNotNull('reception_date')->where('id', '>=', $fund->id)->get();
+        $funds = Fund::whereNotNull('reception_date')->where('id', '>=', $fund->id)->where('type', 'ASIGNACIÓN DE FONDOS DE CAJA CHICA')->get();
 
         $fundEntries = $funds->map(function ($f) use ($toFloat, $nf) {
+            return [
+                'user_register' => $f->name_responsible,
+                'number_note' => null,
+                'approximate_cost' => null,
+                'replacement_cost' => null,
+                'delivery_date' => $f->created_at,
+                'updated_at' => $f->created_at,
+                'products' => [
+                    [
+                        'id' => $f->id,
+                        'description' => $f->type,
+                        'code' => null,
+                        'supplier' => null,
+                        'invoice_number' => null,
+                        'ingresos_raw' => $toFloat($f->received_amount),
+                        'ingresos' => $nf($toFloat($f->received_amount)),
+                        'invoce_number' => null,
+                    ]
+                ],
+            ];
+        });
+
+
+        $fundsrep = Fund::whereNotNull('reception_date')->where('id', '>=', $fund->id)->where('type', 'REPOSICIÓN DE FONDOS')->get();
+
+        $fundEntriesRep = $fundsrep->map(function ($f) use ($toFloat, $nf) {
             return [
                 'user_register' => $f->name_responsible,
                 'number_note' => null,
@@ -483,11 +502,13 @@ class PettycashController extends Controller
 
         $merged = $formatted
             ->concat($fundEntries)
+            ->concat($fundEntriesRep)
             ->concat($ticketPettyCash)
             ->sortBy(function ($item) {
                 return $item['updated_at'];
             })
             ->values();
+
 
         $saldo = 0.0;
         $bookDiary = $merged->map(function ($entry) use (&$saldo, $toFloat, $nf, $fmtDate) {
@@ -571,6 +592,33 @@ class PettycashController extends Controller
 
     public function Petty_Cash_Record_Book_Dates()
     {
+        $existeFund = Fund::exists();
+
+        if (!$existeFund) {
+            $dataPettyCash = [
+                'date' => Carbon::now()->format('Y-m-d'),
+                'name_responsibility' => 'WILLIAM ITURRALDE',
+                'amount' => 0,
+                'discharges' => 0,
+                'balance' => 0,
+                'amount_replacement' => 0,
+                'designation' => 0,
+                'has_no_reception_date' => false,
+                'disabledEndManagement' => ProductController::disableFunds(),
+                'percentages' => [
+                    'discharges' => round(0, 2),
+                    'balance' => round(0, 2),
+
+                    'balance_vs_designation' => round(0, 2),
+                    'discharges_vs_designation' => round(0, 2),
+                ],
+            ];
+
+            return response()->json([
+                'dataPettyCash' => $dataPettyCash,
+            ]);
+        }
+
         $fund = Fund::latest()->first();
 
         $fundsDate = Fund::where('type', 'ASIGNACIÓN DE FONDOS DE CAJA CHICA')
@@ -624,8 +672,28 @@ class PettycashController extends Controller
         $fund = Fund::latest()->first();
         $date_day = Carbon::now()->format('Y-m-d');
         $date_send = Carbon::parse($date_day)->locale('es')->isoFormat('DD [de] MMMM [de] YYYY');
-        $grand_total = $fund->received_amount;
+        $grand_total = $fund->current_amount;
         $number_literal = ProductController::numero_a_letras($grand_total);
+
+
+        $newfund = Fund::create([
+            'received_amount' => $grand_total,
+            'current_amount' => $grand_total,
+            'name_responsible' => 'WILLIAM ITURRALDE QUISBERT',
+            'username_responsible' => 'witurralde',
+            'type' => 'REPOSICIÓN DE FONDOS',
+        ]);
+
+        $recordBook = RecordBook::latest()->first();
+        RecordBook::create([
+            'action' => 'SOLICITUD DE REPOSICION DE FONDOS',
+            'cost' => $grand_total,
+            'date' => today()->toDateString(),
+            'fund_id' => $newfund->id,
+            'incomes' => 0,
+            'expenses' => 0,
+            'total' => $recordBook->total,
+        ]);
 
         $data = [
             'title' => 'ORDEN DE PAGO',
@@ -646,6 +714,21 @@ class PettycashController extends Controller
         $fund = Fund::latest()->first();
         $fund->reception_date = today()->toDateString();
         $fund->save();
+
+        $recordBook = RecordBook::latest()->first();
+        $totalRecord = $recordBook->total;
+        $sumRecord = $fund->received_amount;
+
+        RecordBook::create([
+            'action' => 'REPOSICION DE FONDOS',
+            'cost' => $fund->received_amount,
+            'date' => today()->toDateString(),
+            'fund_id' => $fund->id,
+            'incomes' => $sumRecord,
+            'expenses' => 0,
+            'total' => $totalRecord + $sumRecord,
+        ]);
+
         return response()->json($fund, 201);
     }
 
@@ -740,6 +823,38 @@ class PettycashController extends Controller
         $note->save();
         $total = ($note->approximate_cost - $note->replacement_cost);
 
+        if ($note->type_cash_id == 1) {
+            $recordBook = RecordBook::latest()->first();
+            $totalRecord = $recordBook->total;
+            $sumRecord = $note->approximate_cost - $note->replacement_cost;
+            RecordBook::create([
+                'action' => 'DESCARGO - SOLICITUD DE RECURSOS',
+                'cost' => $note->replacement_cost,
+                'date' => today()->toDateString(),
+                'pettycash_id' => $note->id,
+                'incomes' => $sumRecord,
+                'expenses' => 0,
+                'total' => $totalRecord + $sumRecord,
+            ]);
+        }
+
+        if ($note->type_cash_id == 2) {
+            $recordBook = RecordBook::latest()->first();
+            $totalRecord = $recordBook->total;
+            $sumRecord = $note->replacement_cost;
+            RecordBook::create([
+                'action' => 'REEMBOLSO DE GASTOS',
+                'cost' => $note->replacement_cost,
+                'date' => today()->toDateString(),
+                'pettycash_id' => $note->id,
+                'incomes' => 0,
+                'expenses' => $sumRecord,
+                'total' => $totalRecord - $sumRecord,
+            ]);
+        }
+
+
+
         return response()->json([
             'note' => $note,
             'status' => true,
@@ -765,12 +880,40 @@ class PettycashController extends Controller
 
             $note->state = 'Finalizado';
             $note->delivery_date = today()->toDateString();
+
+            $recordBook = RecordBook::latest()->first();
+            $totalRecord = $recordBook->total;
+            $sumRecord = $note->approximate_cost;
+            RecordBook::create([
+                'action' => 'TRANSPORTE PERSONAL',
+                'cost' => $note->approximate_cost,
+                'date' => today()->toDateString(),
+                'pettycash_id' => $note->id,
+                'incomes' => 0,
+                'expenses' => $sumRecord,
+                'total' => $totalRecord - $sumRecord,
+            ]);
         }
 
         $note->request_date = today()->toDateString();
         $note->save();
 
         $approximate = $note->approximate_cost;
+
+        if ($note->type_cash_id == 1) {
+            $recordBook = RecordBook::latest()->first();
+            $totalRecord = $recordBook->total;
+            $sumRecord = $note->approximate_cost;
+            RecordBook::create([
+                'action' => 'SOLICITUD DE RECURSOS',
+                'cost' => $note->approximate_cost,
+                'date' => today()->toDateString(),
+                'pettycash_id' => $note->id,
+                'incomes' => 0,
+                'expenses' => $note->approximate_cost,
+                'total' => $totalRecord - $sumRecord,
+            ]);
+        }
 
         return response()->json([
             'note' => $note,
@@ -802,6 +945,23 @@ class PettycashController extends Controller
         }
         $note->save();
         $note->delete();
+
+        if ($note->request_date) {
+            $recordBook = RecordBook::latest()->first();
+            $totalRecord = $recordBook->total;
+            $sumRecord = $note->approximate_cost;
+            RecordBook::create([
+                'action' => 'ANULACION DE SOLICITUD',
+                'cost' => $note->approximate_cost,
+                'date' => today()->toDateString(),
+                'pettycash_id' => $note->id,
+                'incomes' => $sumRecord,
+                'expenses' => 0,
+                'total' => $totalRecord + $sumRecord,
+            ]);
+        }
+
+
         return response()->json([
             'note' => $note,
             'status' => true,
@@ -939,7 +1099,6 @@ class PettycashController extends Controller
         $fundConfig->discharge_date = today()->toDateString();
         $fundConfig->current_amount = $request->discharges;
         $fundConfig->save();
-
         $endFundManagement = Fund::create([
             'received_amount' => 0,
             'current_amount' => 0,
@@ -957,17 +1116,209 @@ class PettycashController extends Controller
 
     public function NewManagementPettyCash(Request $request)
     {
-        $fundConfig = Fund::latest()->first();
-        $fundConfig->reception_date = today()->toDateString();
-        $fundConfig->received_amount = $request->assignmentAmount;
-        $fundConfig->current_amount = $request->assignmentAmount;
-        $fundConfig->name_responsible = $request->responsible;
-        $fundConfig->save();
+
+        $existeFund = Fund::exists();
+        if ($existeFund) {
+            $fundConfig = Fund::latest()->first();
+            $fundConfig->reception_date = today()->toDateString();
+            $fundConfig->received_amount = $request->assignmentAmount;
+            $fundConfig->current_amount = $request->assignmentAmount;
+            $fundConfig->name_responsible = $request->responsible;
+            $fundConfig->save();
+        } else {
+            $fundConfig = Fund::create([
+                'reception_date' => today()->toDateString(),
+                'received_amount' => $request->assignmentAmount,
+                'current_amount' => $request->assignmentAmount,
+                'name_responsible' => 'WILLIAM ITURRALDE QUISBERT',
+                'username_responsible' => 'witurralde',
+                'type' => 'ASIGNACIÓN DE FONDOS DE CAJA CHICA',
+            ]);
+        }
+
+        RecordBook::create([
+            'action' => 'ASIGNACIÓN DE FONDOS DE CAJA CHICA',
+            'cost' => $request->assignmentAmount,
+            'date' => today()->toDateString(),
+            'fund_id' => $fundConfig->id,
+            'total' => $request->assignmentAmount,
+        ]);
 
         return response()->json([
             'fund' => $fundConfig,
             'status' => true,
             'message' => "Inicio de Gesión Exitoso"
         ], 200);
+    }
+
+    public function listActivityRecord(Request $request)
+    {
+        $listRecorBooks = RecordBook::all();
+
+        $bookDiaryVisible = $listRecorBooks->map(function ($record) {
+            $date = $record->created_at->format('Y-m-d');
+            $action = $record->action;
+            $incomes = $record->incomes;
+            $expenses = $record->expenses;
+            $total = $record->total;
+            switch ($action) {
+
+                case 'ASIGNACIÓN DE FONDOS DE CAJA CHICA':
+                    $fund = Fund::whereId($record->fund_id)->first();
+                    $name_user = $fund->name_responsible;
+                    $number_note = '';
+                    $products = [
+                        [
+                            'description' => $fund->type . ' POR EL MONTO DE ' . $fund->received_amount . ' Bs',
+                            'supplier' => "",
+                            'invoice_number' => "",
+                            'costDetail' => "",
+                        ]
+                    ];
+
+                    break;
+
+                case 'SOLICITUD DE RECURSOS':
+                    $notePettyCash = PettyCash::withTrashed()->whereId($record->pettycash_id)->first();
+                    $employee = Employee::find($notePettyCash->user_register);
+                    $name_user = $employee ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}" : null;
+                    $number_note = $notePettyCash->number_note;
+                    $amount_delivered = $notePettyCash->approximate_cost;
+                    $products = $notePettyCash->products->map(function ($product) {
+                        return [
+                            'description' => $product->description,
+                            'supplier' => "",
+                            'invoice_number' => "",
+                            'costDetail' => optional($product->pivot)->costFinal,
+                        ];
+                    });
+                    break;
+
+                case 'DESCARGO - SOLICITUD DE RECURSOS':
+                    $notePettyCash = PettyCash::withTrashed()->whereId($record->pettycash_id)->first();
+                    $employee = Employee::find($notePettyCash->user_register);
+                    $name_user = $employee ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}" : null;
+                    $number_note = $notePettyCash->number_note;
+                    $amount_delivered = $notePettyCash->approximate_cost;
+                    $amount_returned = $notePettyCash->approximate_cost - $notePettyCash->replacement_cost;
+                    $products = $notePettyCash->products->map(function ($product) {
+                        return [
+                            'description' => $product->description,
+                            'supplier' => optional($product->pivot)->supplier,
+                            'invoice_number' => optional($product->pivot)->number_invoice,
+                            'costDetail' => optional($product->pivot)->costTotal,
+                        ];
+                    });
+                    break;
+
+                case 'ANULACION DE SOLICITUD':
+                    $notePettyCash = PettyCash::withTrashed()->whereId($record->pettycash_id)->first();
+                    $employee = Employee::find($notePettyCash->user_register);
+                    $name_user = $employee ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}" : null;
+                    $number_note = $notePettyCash->number_note;
+                    $products = $notePettyCash->products->map(function ($product) {
+                        return [
+                            'description' => $product->description,
+                            'supplier' => optional($product->pivot)->supplier,
+                            'invoice_number' => optional($product->pivot)->number_invoice,
+                            'costDetail' => optional($product->pivot)->costTotal,
+                        ];
+                    });
+                    break;
+
+                case 'REEMBOLSO DE GASTOS':
+                    $notePettyCash = PettyCash::withTrashed()->whereId($record->pettycash_id)->first();
+                    $employee = Employee::find($notePettyCash->user_register);
+                    $name_user = $employee ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}" : null;
+                    $number_note = $notePettyCash->number_note;
+                    $amount_delivered = $notePettyCash->approximate_cost;
+                    $products = $notePettyCash->products->map(function ($product) {
+                        return [
+                            'description' => $product->description,
+                            'supplier' => optional($product->pivot)->supplier,
+                            'invoice_number' => optional($product->pivot)->number_invoice,
+                            'costDetail' => optional($product->pivot)->costTotal,
+                        ];
+                    });
+                    break;
+
+                case 'TRANSPORTE PERSONAL':
+                    $notePettyCash = PettyCash::withTrashed()->whereId($record->pettycash_id)->first();
+                    $employee = Employee::find($notePettyCash->user_register);
+                    $name_user = $employee ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}" : null;
+                    $number_note = $notePettyCash->number_note;
+                    $amount_delivered = $notePettyCash->approximate_cost;
+                    $products = $notePettyCash->tickets->map(function ($ticket) {
+                        $round = $ticket->from . ' a ' . $ticket->to;
+                        return [
+                            'description' => $round,
+                            'supplier' => 'TRANSPORTE PERSONAL',
+                            'invoice_number' => $ticket->ticket_invoice,
+                            'costDetail' => $ticket->cost,
+                        ];
+                    });
+                    break;
+
+                case 'SOLICITUD DE REPOSICION DE FONDOS':
+                    $fund = Fund::whereId($record->fund_id)->first();
+                    $name_user = $fund->name_responsible;
+                    $number_note = '';
+                    $products = [
+                        [
+                            'description' => $fund->type . ' POR EL MONTO DE ' . $fund->received_amount . ' Bs',
+                            'supplier' => "",
+                            'invoice_number' => "",
+                            'costDetail' => "",
+                        ]
+                    ];
+
+                    break;
+
+
+                case 'REPOSICION DE FONDOS':
+                    $fund = Fund::whereId($record->fund_id)->first();
+                    $name_user = $fund->name_responsible;
+                    $number_note = '';
+                    $products = [
+                        [
+                            'description' => $fund->type . ' POR EL MONTO DE ' . $fund->received_amount . ' Bs',
+                            'supplier' => "",
+                            'invoice_number' => "",
+                            'costDetail' => "",
+                        ]
+                    ];
+
+                    break;
+
+                default:
+                    $detalle = 'Acción no reconocida.';
+                    break;
+            }
+            return [
+                'id' => $record->id,
+                'date' => $date,
+                'action' => $record->action,
+                'user' => $name_user,
+                'number_note' => $number_note,
+                'products' => $products,
+                'amount_delivered' => $amount_delivered ?? 0.00,
+                'amount_returned' => $amount_returned ?? 0.00,
+                'incomes' => $incomes,
+                'expenses' => $expenses,
+                'total' => $total,
+            ];
+        });
+
+        // return response()->json($bookDiaryVisible);
+
+        $data = [
+            'date' => Carbon::now()->format('Y-m-d'),
+            'name' => 'WILLIAM ITURRALDE QUISBERT',
+            'area' => 'UNIDAD ADMINISTRATIVA',
+            'book_diary' => $bookDiaryVisible,
+        ];
+
+        $pdf = Pdf::loadView('NotePettyCash.PettyCashListRecordBook', $data);
+        return $pdf->download('libro_de_diario.pdf');
     }
 }

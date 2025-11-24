@@ -10,6 +10,7 @@ use App\Models\Management;
 use App\Models\Material;
 use App\Models\PettyCash;
 use App\Models\Product;
+use App\Models\RecordBook;
 use App\Models\TypeCancellation;
 use App\Models\TypePetty;
 use App\Models\User;
@@ -56,9 +57,13 @@ class ProductController extends Controller
 
     public static function disableFunds()
     {
-        $fund = Fund::where('type', 'ASIGNACIÓN DE FONDOS DE CAJA CHICA')
-            ->latest()
-            ->first();
+        $fundFirst = Fund::where('type', 'ASIGNACIÓN DE FONDOS DE CAJA CHICA')->oldest()->first();
+        
+        if (is_null($fundFirst)) {
+            return true;
+        }
+
+        $fund = Fund::where('type', 'ASIGNACIÓN DE FONDOS DE CAJA CHICA')->latest()->first();
         if ($fund && $fund->received_amount == 0 && $fund->current_amount == 0 && is_null($fund->reception_date)) {
             return true;
         }
@@ -139,6 +144,7 @@ class ProductController extends Controller
                     'name_product' => $productData['description'],
                     'supplier' => $productData['provider'],
                     'costDetails' => $productData['price'],
+                    'costFinal' => $productData['quantity'] * $productData['price'],
                     'quantity_delivered' => $productData['quantity'],
                     'costDetailsFinal' => $productData['price'],
                     'costTotal' => ($productData['quantity'] * $productData['price']),
@@ -162,13 +168,11 @@ class ProductController extends Controller
                 $notePettyCash->products()->attach($productData['id'], [
                     'amount_request' => $productData['quantity'],
                     'name_product' => $productData['description'],
-                    'costDetails' => $productData['price']
+                    'costDetails' => $productData['price'],
+                    'costFinal' => $productData['quantity'] * $productData['price'],
                 ]);
             }
         }
-
-
-
 
         return response()->json($notePettyCash->load('products'), 201);
     }
@@ -209,7 +213,7 @@ class ProductController extends Controller
                 'subtitle' => $type->description,
                 'code' => $type->code,
                 'number_note' => $notepettyCash->number_note,
-                'date' => $notepettyCash->request_date,
+                'date' => $notepettyCash->request_date ? $notepettyCash->request_date : today()->toDateString(),
                 'employee' => $employee
                     ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}"
                     : null,
@@ -243,7 +247,7 @@ class ProductController extends Controller
                     'subtitle' => $type->description,
                     'code' => $type->code,
                     'number_note' => $notepettyCash->number_note,
-                    'date' => $notepettyCash->request_date,
+                    'date' => $notepettyCash->request_date ? $notepettyCash->request_date : today()->toDateString(),
                     'employee' => $employee
                         ? "{$employee->first_name} {$employee->last_name} {$employee->mothers_last_name}"
                         : null,
@@ -405,7 +409,6 @@ class ProductController extends Controller
     public function save_petty_cash(Request $request)
     {
         try {
-            logger($request);
             $fund = Fund::latest()->first();
             $pettyCash = PettyCash::find($request['requestId']);
 
@@ -452,84 +455,6 @@ class ProductController extends Controller
                 'message' => $e->getMessage(),
             ], 500);
         }
-    }
-
-    public function change_petty_cash_to_replenishment_of_funds(Request $request)
-    {
-        return DB::transaction(function () use ($request) {
-
-            $from = PettyCash::with('products')->findOrFail($request['requestId']);
-
-            $to = PettyCash::create([
-                'number_note' => $from->number_note,
-                'concept' => "(REEMBOLSO) $from->concept",
-                'request_date' => $from->request_date,
-                'delivery_date' => today()->toDateString(),
-                'comment_recived' => 'Aun no puede imprimir',
-                'approximate_cost' => $from->approximate_cost,
-                'replacement_cost' => $from->replacement_cost,
-                'state' => 'Aceptado',
-                'user_register' => $from->user_register,
-                'management_id' => $from->management_id,
-                'fund_id' => $from->fund_id,
-                'type_cash_id' => 2,
-            ]);
-
-            $pivotData = $from->products->mapWithKeys(function ($product) {
-                return [
-                    $product->id => [
-                        'supplier' => $product->pivot->supplier,
-                        'number_invoice'  => $product->pivot->number_invoice,
-                        'quantity_delivered' => $product->pivot->quantity_delivered,
-                        'costDetailsFinal' => $product->pivot->costDetailsFinal,
-                        'costTotal' => $product->pivot->costTotal,
-                        'amount_request' => $product->pivot->amount_request,
-                        'name_product' => $product->pivot->name_product,
-                        'costDetails' => $product->pivot->costDetails,
-                        'costFinal' => $product->pivot->costFinal,
-                    ]
-                ];
-            })->toArray();
-
-            $from->delete();
-
-            $to->products()->sync($pivotData);
-
-
-            $sum_product = 0;
-
-            foreach ($request['products'] as $productData) {
-                $product = Product::where('description', $productData['description'])->first();
-
-                if (!$product) {
-                    return response()->json(['error' => 'Product not found.'], 404);
-                }
-                $sum_product += $productData['total'];
-
-                $to->products()->syncWithoutDetaching([
-                    $product->id => [
-                        'supplier' => $productData['supplier'],
-                        'number_invoice' => $productData['numer_invoice'],
-                        'amount_request' => $productData['amount'],
-                        'quantity_delivered' => $productData['amount'],
-                        'costDetailsFinal' => $productData['costUnit'],
-                        'costDetails' => $productData['costUnit'],
-                        'costTotal' => $productData['total'],
-                    ],
-                ]);
-            }
-
-            $to->replacement_cost = $sum_product;
-            $to->approximate_cost = $sum_product;
-
-            $to->save();
-
-            return response()->json([
-                'from_note_id' => $from->id,
-                'to_note_id' => $to->id,
-                'products_copied' => count($pivotData),
-            ], 201);
-        });
     }
 
     public function print_Petty_Cash_discharge(PettyCash $notepettyCash)
@@ -580,11 +505,5 @@ class ProductController extends Controller
         $literal .= " con " . str_pad($decimal, 2, "0", STR_PAD_RIGHT) . "/100";
 
         return $literal;
-    }
-
-    public function listPermission(Request $request)
-    {
-        logger($request->id);
-        $permission = DB::select();
     }
 }

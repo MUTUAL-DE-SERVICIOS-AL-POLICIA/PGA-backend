@@ -18,4 +18,9 @@ class Fund extends Model
     {
         return $this->hasMany(PettyCash::class, 'fund_id');
     }
+
+    public function recordBooks()
+    {
+        return $this->hasMany(RecordBook::class);
+    }
 }
