@@ -491,6 +491,28 @@ class ProductController extends Controller
         return $pdf->download('Vale_caja_chica_form_2.pdf');
     }
 
+
+
+    public function print_Petty_Cash_discharge_trasnport(PettyCash $notepettyCash)
+    {
+        $requests_date = $notepettyCash->request_date;
+        $type = TypePetty::whereId($notepettyCash->type_cash_id)->first();
+        $employee = Employee::find($notepettyCash->user_register);
+        $data = [
+            'title' => 'DESCARGO DE CAJA CHICA',
+            'subtitle' => $type->description,
+            'code' => $type->code,
+            'number_note' => $notepettyCash->number_note,
+            'date' => $notepettyCash->delivery_date,
+            'request_date' => $requests_date,
+            'concept' => $notepettyCash->concept,
+            'employee' => "{$employee->first_name} {$employee->last_name}",
+            'total_petty_cash' => $notepettyCash->approximate_cost
+        ];
+        $pdf = Pdf::loadView('NotePettyCash.NotePettyCashFormTransport', $data);
+        return $pdf->download('Vale_caja_chica_form_2.pdf');
+    }
+
     public static function numero_a_letras($numero)
     {
         $formatter = new NumberFormatter("es", NumberFormatter::SPELLOUT);

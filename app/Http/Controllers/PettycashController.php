@@ -436,7 +436,7 @@ class PettycashController extends Controller
                     [
                         'id' => $f->id,
                         'description' => "TRANSPORTE DE PERSONAL",
-                        'code' => null,
+                        'code' => '22600',
                         'supplier' => null,
                         'invoice_number' => null,
                         'costDetail_raw' => $toFloat($f->approximate_cost),
