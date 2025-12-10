@@ -33,6 +33,7 @@ Route::group([
     Route::get('/printPettCash/{notepettyCash}', [ProductController::class, 'print_Petty_Cash']);
     Route::get('/print_Petty_Cash_Trasnport/{notepettyCash}', [ProductController::class, 'print_Petty_Cash_Trasnport']);
     Route::get('/printPettCashDischarge/{notepettyCash}', [ProductController::class, 'print_Petty_Cash_discharge']);
+    Route::get('print_Petty_Cash_discharge_trasnport/{notepettyCash}', [ProductController::class, 'print_Petty_Cash_discharge_trasnport']);
     Route::get('/list_group', [ProductController::class, 'list_group']);
     Route::post('/savePettyCashDetails', [ProductController::class, 'save_petty_cash']);
     Route::post('/request_cancellation', [PettycashController::class, 'request_cancellation']);
@@ -124,6 +125,7 @@ Route::group([
         Route::post('NewManagementPettyCash', [PettycashController::class, 'NewManagementPettyCash']);
 
         Route::get('listActivityRecord', [PettycashController::class, 'listActivityRecord']);
+
 
         Route::get('/php-config', function () {
             return response()->json([
