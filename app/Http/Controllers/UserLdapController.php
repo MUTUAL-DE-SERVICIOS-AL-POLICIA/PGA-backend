@@ -32,7 +32,7 @@ class UserLdapController extends Controller
             return [
                 'id' => $user->id,
                 'username' => $user->username,
-                'position' => $user->position,
+                'position' => $this->titlePerson($user->employee_id),
                 'roles' => $user->roles->pluck('name'),
                 'all_permissions' => $user->all_permissions,
                 'active' => $userStoreStatus->get($user->username, false),
@@ -91,11 +91,11 @@ class UserLdapController extends Controller
         $noteRequests = $query->get();
 
         $employee = $noteRequests->first() ? $noteRequests->first()->employee : null;
-        
+
         $materialsGrouped = [];
 
         $positionName = $this->titlePerson($employee->id);
-        
+
 
         foreach ($noteRequests as $noteRequest) {
             foreach ($noteRequest->materials as $material) {
