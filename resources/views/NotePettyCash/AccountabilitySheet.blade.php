@@ -181,7 +181,7 @@ $dns = new DNS2D();
             </tr>
             <tr>
                 <td class="text-left border-left-white">Saldos en efectivo </td>
-                <td class="text-center border-left-white">{{$funds_vs_spent_diff}}</td>
+                <td class="text-center border-left-white">{{($funds_vs_spent_diff)}}</td>
             </tr>
         </tbody>
     </table>

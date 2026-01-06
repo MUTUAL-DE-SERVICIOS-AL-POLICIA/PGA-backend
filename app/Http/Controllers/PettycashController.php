@@ -265,6 +265,12 @@ class PettycashController extends Controller
         $fundConfig->current_amount = $grandTotalFormatted;
         $fundConfig->save();
 
+        $assignmentFund = Fund::where('type', 'ASIGNACIÓN DE FONDOS DE CAJA CHICA')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $fundsVsSpentDiffFormatted = number_format($assignmentFund->received_amount - $grandTotalFormatted, 2, '.', '');
+
         $data = [
             'title' => 'PLANILLA DE RENDICIÓN DE CUENTAS',
             'date' => Carbon::now()->format('Y'),
@@ -272,10 +278,12 @@ class PettycashController extends Controller
             'area' => 'UNIDAD ADMINISTRATIVA',
             'products' => $combined,
             'grand_total'  => $grandTotalFormatted,
-            'funds_total_received' => $fundsTotalReceivedFormatted,
+            'funds_total_received' => $assignmentFund->received_amount,
             'funds_vs_spent_diff'  => $fundsVsSpentDiffFormatted,
             'groups' => $groupsSummary,
         ];
+
+        
 
         $pdf = Pdf::loadView('NotePettyCash.AccountabilitySheet', $data);
         return $pdf->download('Planilla_de_rendicion_de_cuentas.pdf');
