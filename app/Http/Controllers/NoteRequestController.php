@@ -107,6 +107,7 @@ class NoteRequestController extends Controller
 
     public function listUserNoteRequests($userId)
     {
+        logger($userId);
         $noteRequests = NoteRequest::where('user_register', $userId)->with('materials')->orderBy('id', 'desc')->get();
 
         if ($noteRequests->isEmpty()) {

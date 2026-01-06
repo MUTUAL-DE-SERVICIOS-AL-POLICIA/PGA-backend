@@ -1182,6 +1182,8 @@ class ReportController extends Controller
             'title' => 'INVENTARIO FISICO VALORADO ALMACENES MUSERPOL',
             'result' => $result,
             'date_note' => $formattedDate,
+            'start_date' => $startDate,
+            'end_date' => $endDate
         ];
 
         $pdf = Pdf::loadView('ValuedPhysical.ValuedPhysical', $data)->setPaper('letter', 'landscape');

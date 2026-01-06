@@ -51,10 +51,8 @@ class AuthController extends Controller
             return $this->unauthorizedResponse('Usuario desactivado');
         }
         if (!env("LDAP_AUTHENTICATION")) {
-            logger("1");
             return $this->handleDatabaseAuthentication($request, $user);
         } else {
-            logger("2");
             return $this->handleLdapAuthentication($request);
         }
     }
