@@ -41,6 +41,7 @@ class AuthController extends Controller
                 }
             }
         }
+
         $user = User::whereUsername($request['username'])->first();
         if (!$user) {
             return $this->unauthorizedResponse('Usuario no encontrado');
@@ -49,7 +50,6 @@ class AuthController extends Controller
         if (!$user->active) {
             return $this->unauthorizedResponse('Usuario desactivado');
         }
-
         if (!env("LDAP_AUTHENTICATION")) {
             return $this->handleDatabaseAuthentication($request, $user);
         } else {

@@ -30,4 +30,8 @@ class Group extends Model
     {
         return $this->hasMany(Product::class);
     }
+
+    public function Tickets(){
+        return $this->hasMany(Ticket::class);
+    }
 }

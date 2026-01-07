@@ -27,7 +27,7 @@ $dns = new DNS2D();
             display: flex;
             flex-direction: column;
             min-height: 100vh;
-            font-size: 12px;
+            font-size: 9px;
         }
 
         .footer {
@@ -73,7 +73,7 @@ $dns = new DNS2D();
                     <tbody>
                         <tr>
                             <th class="bg-grey-darker text-white text-center" colspan="2">
-                                LIBRO DE REGISTROS COMPLETADOS
+                                LIBRO DIARIO
                             </th>
                         </tr>
                         <tr>
@@ -100,72 +100,103 @@ $dns = new DNS2D();
         <table class="table-info table-info-sm w-100 m-b-10 uppercase text-xs">
             <thead>
                 <tr>
-                    <th class="text-center bg-grey-darker text-white">ITEM</th>
+                    <th class="text-center bg-grey-darker text-white">N°</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">FECHA</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">BENEFICIARIO</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">N° VALE</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">IMPORTE ENTREGADO</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">IMPORTE DEVUELTO</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">SOLICITUD</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">DESCRIPCIÓN</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">PROVEEDOR</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">N° FACTURA</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">PRODUCTO</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">PARTIDA</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">IMPORTE</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">SOLICITADO</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">GASTADO</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">INGRESOS</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">GASTO</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">SALIDAS</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">SALDO</th>
                 </tr>
             </thead>
+
             <tbody>
                 @foreach ($book_diary as $entry)
                 @php
                 $products = $entry['products'] ?? [];
+                $isReposicion =
+                $entry['action'] === 'SOLICITUD DE REPOSICION DE FONDOS' ||
+                $entry['action'] === 'REPOSICION DE FONDOS' ||
+                $entry['action'] === 'ASIGNACIÓN DE FONDOS DE CAJA CHICA';
                 @endphp
 
-                @if (empty($products) || count($products) === 0)
+                @if ($isReposicion)
                 <tr>
                     <td class="text-center">{{ $loop->iteration }}</td>
-                    <td class="text-center">{{ $entry['delivery_date'] }}</td>
-                    <td class="text-left">{{ $entry['user_register'] }}</td>
+                    <td class="text-center">{{ $entry['date'] }}</td>
+                    <td class="text-left">{{ $entry['user'] }}</td>
                     <td class="text-center">{{ $entry['number_note'] }}</td>
-                    <td class="text-center">{{ $entry['importe_entregado'] }}</td>
-                    <td class="text-center">{{ $entry['importe_devuelto'] }}</td>
+                    <td class="text-left">{{ $entry['action'] }}</td>
+                    <td class="text-left" colspan="6">
+                        {{ $products[0]['description'] ?? '' }}
+                    </td>
+
+                    <td class="text-right">{{ $entry['incomes'] }}</td>
+                    <td class="text-right">{{ $entry['expenses'] }}</td>
+                    <td class="text-right">{{ $entry['total'] }}</td>
+                </tr>
+                @continue
+                @endif
+
+                @if (empty($products))
+                <tr>
+                    <td class="text-center">{{ $loop->iteration }}</td>
+                    <td class="text-center">{{ $entry['date'] }}</td>
+                    <td class="text-left">{{ $entry['user'] }}</td>
+                    <td class="text-center">{{ $entry['number_note'] }}</td>
+                    <td class="text-left">{{ $entry['action'] }}</td>
+
+                    <td class="text-left">-</td>
                     <td class="text-left">-</td>
                     <td class="text-center">-</td>
-                    <td class="text-left">-</td>
                     <td class="text-center">-</td>
-                    <td class="text-right">-</td>
-                    <td class="text-right">-</td>
-                    <td class="text-right">{{ $entry['saldo_current'] }}</td>
+
+                    <td class="text-right">{{ $entry['incomes'] }}</td>
+                    <td class="text-right">{{ $entry['expenses'] }}</td>
+                    <td class="text-right">{{ $entry['total'] }}</td>
                 </tr>
                 @else
                 @foreach ($products as $idx => $product)
                 <tr>
                     @if ($idx === 0)
                     <td class="text-center">{{ $loop->parent->iteration }}</td>
-                    <td class="text-center">{{ $entry['delivery_date'] }}</td>
-                    <td class="text-left">{{ $entry['user_register'] }}</td>
+                    <td class="text-center">{{ $entry['date'] }}</td>
+                    <td class="text-left">{{ $entry['user'] }}</td>
                     <td class="text-center">{{ $entry['number_note'] }}</td>
-                    <td class="text-center">{{ $entry['importe_entregado'] }}</td>
-                    <td class="text-center">{{ $entry['importe_devuelto'] }}</td>
+                    <td class="text-left">{{ $entry['action'] }}</td>
                     @else
-                    <td class="text-center" colspan="6"></td>
+                    <td class="text-center" colspan="5"></td>
                     @endif
 
-                    <td class="text-left">{{ $product['supplier'] ?? '-' }}</td>
-                    <td class="text-center">
-                        {{ $product['invoice_number'] ?? ($product['invoce_number'] ?? '-') }}
-                    </td>
                     <td class="text-left">{{ $product['description'] ?? '-' }}</td>
-                    <td class="text-center">{{ $product['code'] ?? '-' }}</td>
+                    <td class="text-left">{{ $product['supplier'] ?? '-' }}</td>
+                    <td class="text-center">{{ $product['invoice_number'] ?? '-' }}</td>
+                    <td class="text-center">{{ $product['costDetail'] ?? '-' }}</td>
+                    @if ($idx === 0)
+                    <td class="text-right">{{ $entry['amount_delivered'] }}</td>
+                    <td class="text-right">{{ $entry['amount_delivered'] - $entry['amount_returned'] }}</td>
+                    <td class="text-right">{{ $entry['incomes'] }}</td>
+                    <td class="text-right">{{ $entry['expenses'] }}</td>
+                    <td class="text-right">{{ $entry['total'] }}</td>
+                    @else
+                    <td class="text-center" colspan="5"></td>
 
-                    <td class="text-right">{{ $product['ingreso'] }}</td>
-                    <td class="text-right">{{ $product['gasto'] }}</td>
-                    <td class="text-right">{{ $product['saldo'] }}</td>
+                    @endif
                 </tr>
                 @endforeach
                 @endif
+
                 @endforeach
             </tbody>
+
+
         </table>
     </div>
     <table>

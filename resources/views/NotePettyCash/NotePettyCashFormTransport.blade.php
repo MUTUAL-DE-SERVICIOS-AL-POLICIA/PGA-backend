@@ -96,7 +96,7 @@ $dns = new DNS2D();
             </th>
             <th class="w-50 align-top">
                 <div class="font-hairline leading-tight text-xs">
-                    <div>FORMULARIO N° 4</div>
+                    <div>FORMULARIO N° 5</div>
                     <div>{{$title}}</div>
                 </div>
             </th>
@@ -125,59 +125,52 @@ $dns = new DNS2D();
             <thead>
                 <tr>
                     <th class="text-center bg-grey-darker text-white">ITEM</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">PROVEEDOR</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">NOMBRE DE BENEFICIARIO</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">FECHA</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">N° DE FACTURA</th>
-                    <th class="text-center bg-grey-darker text-white border-left-white">PARTIDA PRESUPUESTARIA</th>
+                    <th class="text-center bg-grey-darker text-white border-left-white">OBJETO DE GASTO</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">CANTIDAD</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">PRECIO UNIT</th>
                     <th class="text-center bg-grey-darker text-white border-left-white">TOTAL (BS)</th>
                 </tr>
             </thead>
             <tbody class="table-striped">
-                @foreach ($products as $i => $product)
+
                 <tr>
-                    <td class="text-center">{{ ++$i }}</td>
-                    <td class="text-center">{{ $product['supplier'] }}</td>
+                    <td class="text-center">1</td>
+                    <td class="text-center">{{ $employee }}</td>
                     <td class="text-center">{{ $request_date }}</td>
-                    <td class="text-center">{{ $product['number_invoice'] }}</td>
-                    <td class="text-center">{{ $product['code_group'] }}</td>
-                    <td class="text-center">{{ $product['quantity'] }}</td>
-                    <td class="text-center">{{ $product['price'] }}</td>
-                    <td class="text-right">{{ number_format($product['total'], 2)}}</td>
+                    <td class="text-center">TRANSPORTE PERSONAL</td>
+                    <td class="text-center">1</td>
+                    <td class="text-center">{{ $total_petty_cash }}</td>
+                    <td class="text-center">{{ $total_petty_cash }}</td>
                 </tr>
-                @endforeach
-                @for($i = sizeof($products) + 1; $i <= $max_requests; $i++)
+
+                @for($i = 2; $i <= $max_requests; $i++)
                     <tr>
-                    <td class="text-center" colspan="8">&nbsp;</td>
+                    <td class="text-center" colspan="7">&nbsp;</td>
                     </tr>
                     @endfor
 
                     <tr>
-                        <td class="text-left" colspan="7"><strong>VALOR TOTAL DE COMPRA DEL BIEN O SERVICIO EN BS.</strong></td>
-                        <td class="text-right"><strong>{{ number_format($products->sum(function($product) {return $product['total'];}), 2) }}</strong></td>
+                        <td class="text-left" colspan="6"><strong>VALOR TOTAL DE COMPRA DEL BIEN O SERVICIO EN BS.</strong></td>
+                        <td class="text-right"><strong>{{ $total_petty_cash }}</strong></td>
                     </tr>
                     <tr>
-                        <td class="text-center" colspan="8">&nbsp;</td>
+                        <td class="text-center" colspan="7">&nbsp;</td>
                     </tr>
                     <tr>
-                        <td class="text-left" colspan="7"><strong>SALDO A DEVOLVER EN BS.</strong></td>
+                        <td class="text-left" colspan="6"><strong>SALDO A DEVOLVER EN BS.</strong></td>
                         <td class="text-right">
                             <strong>
-                                {{
-                number_format(
-                    $total_petty_cash - $products->sum(function($product) { return $product['total']; }),
-                    2
-                )
-            }}
+                                0
                             </strong>
                         </td>
                     </tr>
                     <tr>
-                        <td class="text-center" colspan="8">&nbsp;</td>
+                        <td class="text-center" colspan="7">&nbsp;</td>
                     </tr>
                     <tr>
-                        <td class="text-left" colspan="7"><strong>VALOR ENTREGADO EN BS.</strong></td>
+                        <td class="text-left" colspan="6"><strong>VALOR ENTREGADO EN BS.</strong></td>
                         <td class="text-right"><strong>{{ $total_petty_cash }}</strong></td>
                     </tr>
             </tbody>
@@ -196,7 +189,7 @@ $dns = new DNS2D();
                     <br />
                     <strong>Entregué Conforme: </strong>
                     <br /><br />
-                    
+
                 </td>
                 <td class="text-center" style="width: 50%; vertical-align: top;">
                     <br /><br />
@@ -204,7 +197,7 @@ $dns = new DNS2D();
                     <br />
                     <strong>Recibí Conforme:</strong>
                     <br /><br />
-    
+
                 </td>
             </tr>
         </table>

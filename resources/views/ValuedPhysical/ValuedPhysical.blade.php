@@ -11,11 +11,14 @@ $formatter = new IntlDateFormatter(
     IntlDateFormatter::NONE,
     null,
     null,
-    'd \'DE\' MMMM \'DE\' y'
+    "d 'DE' MMMM 'DE' y"
 );
-$fecha_actual = $formatter->format(new DateTime());
 
-$fecha_actual = strtoupper($fecha_actual);
+$fecha_inicio_dt = new DateTime($start_date);
+$fecha_fin_dt = new DateTime($end_date);
+
+$fecha_inicio = strtoupper($formatter->format($fecha_inicio_dt));
+$fecha_fin = strtoupper($formatter->format($fecha_fin_dt));
 
 $date = '12/01/2024';
 $dns = new DNS2D();
@@ -120,7 +123,10 @@ $dns = new DNS2D();
         <hr class="m-b-10" style="margin-top: 0; padding-top: 0;">
         <div class="block">
             <div class="leading-tight text-sm text-center m-b-10">{{ $title }}</div>
-            <div class="leading-tight text-xxxl text-center m-b-10">LA PAZ, DEL {{ strtoupper($date_note) }} AL {{ $fecha_actual }}</div>
+            <div class="leading-tight text-xxxl text-center m-b-10">
+                LA PAZ, DEL {{ $fecha_inicio }} AL {{ $fecha_fin }}
+            </div>
+
             @foreach ($result as $index => $result)
             <div class="leading-tight text-xxl text-left m-b-10">{{ $result['codigo_grupo'] }}, GRUPO: {{ strtoupper($result['grupo']) }}</div>
             <table class="table-info w-100 m-b-10 uppercase text-xs">
@@ -157,14 +163,14 @@ $dns = new DNS2D();
 
                     @foreach ($result['materiales'] as $material)
                     @php
-                    
+
                     $m = [
-                        'sa_cant' => 0, 'sa_total' => 0,           
-                        'ent_cant' => 0, 'ent_total' => 0,         
-                        'sal_cant' => 0, 'sal_total' => 0,         
-                        'saldo_cant' => 0, 'saldo_total' => 0,    
+                    'sa_cant' => 0, 'sa_total' => 0,
+                    'ent_cant' => 0, 'ent_total' => 0,
+                    'sal_cant' => 0, 'sal_total' => 0,
+                    'saldo_cant' => 0, 'saldo_total' => 0,
                     ];
-                    
+
 
                     $saldos = $material['saldo_anterior'] ?? [];
                     $lotes = $material['lotes'] ?? [];
@@ -194,29 +200,29 @@ $dns = new DNS2D();
                         if (is_numeric($cantidad_1)) $totalEntradasCosto += $cantidad_1;
 
                         if (is_numeric($cantidadEntradas) && is_numeric($cantidadRestante)) {
-                            $salidas = $cantidadEntradas - $cantidadRestante;
-                            $totalCantidades += $salidas;
-                            if (is_numeric($cantidad_2)) $totalCantidadesCosto += $cantidad_2;
+                        $salidas = $cantidadEntradas - $cantidadRestante;
+                        $totalCantidades += $salidas;
+                        if (is_numeric($cantidad_2)) $totalCantidadesCosto += $cantidad_2;
                         } else {
-                            $salidas = '';
+                        $salidas = '';
                         }
 
                         if (is_numeric($cantidadRestante)) $totalSaldos += $cantidadRestante;
                         if (is_numeric($cantidad_3)) $totalSaldosCosto += $cantidad_3;
 
-                        
-                        if (is_numeric($sa['cantidad_restante'])) $m['sa_cant']   += $sa['cantidad_restante'];
-                        if (is_numeric($sa['valor_restante']))   $m['sa_total']  += $sa['valor_restante'];
 
-                        if (is_numeric($cantidadEntradas))       $m['ent_cant']  += $cantidadEntradas;
-                        if (is_numeric($cantidad_1))             $m['ent_total'] += $cantidad_1;
+                        if (is_numeric($sa['cantidad_restante'])) $m['sa_cant'] += $sa['cantidad_restante'];
+                        if (is_numeric($sa['valor_restante'])) $m['sa_total'] += $sa['valor_restante'];
+
+                        if (is_numeric($cantidadEntradas)) $m['ent_cant'] += $cantidadEntradas;
+                        if (is_numeric($cantidad_1)) $m['ent_total'] += $cantidad_1;
 
                         if ($salidas !== '' && is_numeric($salidas)) $m['sal_cant'] += $salidas;
-                        if (is_numeric($cantidad_2))                 $m['sal_total'] += $cantidad_2;
+                        if (is_numeric($cantidad_2)) $m['sal_total'] += $cantidad_2;
 
-                        if (is_numeric($cantidadRestante))       $m['saldo_cant']  += $cantidadRestante;
-                        if (is_numeric($cantidad_3))             $m['saldo_total'] += $cantidad_3;
-                        
+                        if (is_numeric($cantidadRestante)) $m['saldo_cant'] += $cantidadRestante;
+                        if (is_numeric($cantidad_3)) $m['saldo_total'] += $cantidad_3;
+
                         @endphp
 
                         <tr>
@@ -281,10 +287,10 @@ $dns = new DNS2D();
                         $totalSaldoAnteriorTotal = 0;
 
                         foreach ($result['materiales'] as $material) {
-                            foreach ($material['saldo_anterior'] ?? [] as $sa) {
-                                $totalSaldoAnteriorCantidad += $sa['cantidad_restante'] ?? 0;
-                                $totalSaldoAnteriorTotal += $sa['valor_restante'] ?? 0;
-                            }
+                        foreach ($material['saldo_anterior'] ?? [] as $sa) {
+                        $totalSaldoAnteriorCantidad += $sa['cantidad_restante'] ?? 0;
+                        $totalSaldoAnteriorTotal += $sa['valor_restante'] ?? 0;
+                        }
                         }
                         @endphp
 
