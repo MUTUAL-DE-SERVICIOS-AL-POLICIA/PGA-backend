@@ -92,6 +92,7 @@ Route::group([
 
         Route::get('/PrintValuedPhysicalConsolidated', [ReportController::class, 'print_consolidated_valued_physical_inventory']);
         Route::get('/ManagementClosure', [ReportController::class, 'management_closure']);
+        Route::get('/revert_management_closure', [ReportController::class, 'revert_management_closure']);
 
         Route::get('/funcion/{material}', [ReportController::class, 'calculateMaterialCost']);
 
