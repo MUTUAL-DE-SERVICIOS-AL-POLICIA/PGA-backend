@@ -66,6 +66,7 @@ class ReportController extends Controller
                 ->orderBy('received_on_date', 'asc')
                 ->get();
 
+
             $movements = [];
 
             foreach ($entries as $entry) {
@@ -504,8 +505,8 @@ class ReportController extends Controller
                 'totales' => $totales,
                 'start_date' => $startDate,
                 'end_date' => $dateof,
-                'firtsDay'=> $firstDay,
-                'lastDay'=> $lastDayPrevYear,
+                'firtsDay' => $firstDay,
+                'lastDay' => $lastDayPrevYear,
                 'balance_amount_entries' => $amountEntriesTotal,
                 'balance_cost_total' => $costTotalTotal
             ];
@@ -1475,18 +1476,23 @@ class ReportController extends Controller
 
                 foreach ($notesWithBalances as $note) {
                     $newNote = Note_Entrie::create([
-                        'number_note' => $this->generateNoteNumber(),
-                        'invoice_number' => $note->invoice_number,
+                        'number_note'   => $this->generateNoteNumber(),
                         'delivery_date' => $note->delivery_date,
-                        'state' => 'Aceptado',
-                        'invoice_auth' => $note->invoice_auth,
+                        'state'         => 'Aceptado',
+                        'invoice_auth'  => $note->invoice_auth,
                         'user_register' => $note->user_register,
-                        'observation' => 'Saldo trasladado',
-                        'type_id' => $note->type_id,
-                        'suppliers_id' => $note->suppliers_id,
-                        'name_supplier' => 'Generado por Cierre de Gestión',
+                        'observation'   => 'Saldo trasladado',
+                        'type_id'       => $note->type_id,
                         'management_id' => $newManagement->id,
                     ]);
+
+                    foreach ($note->suppliers as $supplier) {
+                        $newNote->suppliers()->attach($supplier->id, [
+                            'invoice_number' => $supplier->pivot->invoice_number,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
 
                     foreach ($note->materials as $material) {
                         if ($material->pivot->request > 0) {
@@ -1507,6 +1513,48 @@ class ReportController extends Controller
 
             return response()->json(['message' => 'Gestión cerrada y nueva gestión creada exitosamente.'], 200);
         } catch (\Exception $e) {
+            logger($e);
+            return response()->json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+
+    public function revert_management_closure()
+    {
+        try {
+            DB::transaction(function () {
+                
+                $latestManagement = Management::latest('id')->first();
+
+                
+                if ($latestManagement->state !== 'Abierto') {
+                    throw new \Exception('No se puede revertir: la última gestión no está abierta.');
+                }
+
+                $notesToDelete = Note_Entrie::where('management_id', $latestManagement->id)->get();
+
+                foreach ($notesToDelete as $note) {
+                    $note->materials()->detach();  
+                    $note->suppliers()->detach();  
+                    $note->delete();               
+                }
+
+                
+                $previousManagement = Management::latest('id')->first();
+
+                if (!$previousManagement) {
+                    throw new \Exception('No se encontró la gestión anterior.');
+                }
+
+                
+                $previousManagement->state = 'Abierto';
+                $previousManagement->close_date = null;
+                $previousManagement->save();
+            });
+
+            return response()->json(['message' => 'Cierre de gestión revertido exitosamente.'], 200);
+        } catch (\Exception $e) {
+            logger($e);
             return response()->json(['error' => $e->getMessage()], 400);
         }
     }
