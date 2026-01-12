@@ -9,51 +9,89 @@ use Illuminate\Support\Facades\DB;
 
 class MaterialCorrection extends Command
 {
-    protected $signature = 'reset:material-correction 
-                            {materialId : ID del Material} 
-                            {entryId : ID de la entrada de material} 
-                            {stock : Nuevo stock para el Material} 
-                            {request : Nuevo request para Entrie_Material}';
+    protected $signature = 'reset:material-correction';
 
-    /**
-     * La descripción del comando.
-     */
     protected $description = 'Resetea y corrige los registros relacionados con materiales de forma segura';
 
-    /**
-     * Ejecuta el comando.
-     */
     public function handle()
     {
-        $materialId = $this->argument('materialId');
-        $entryId = $this->argument('entryId');
-        $stock = $this->argument('stock');
-        $request = $this->argument('request');
+        DB::transaction(function () {
 
-        try {
-            DB::transaction(function () use ($materialId, $entryId, $stock, $request) {
-                $material = Material::find($materialId);
-                if (!$material) {
-                    $this->error("Material con ID {$materialId} no encontrado.");
-                    return;
-                }
-                $material->update(['stock' => $stock]);
+            // BOLÍGRAFO AZUL
+            $this->fixMaterial(
+                entryRequestId: 934,
+                entryMainId: 1359,
+                materialId: 156,
+                amount: 1130,
+                costTotal: 2203.5
+            );
 
-                $entry = Entrie_Material::find($entryId);
-                if (!$entry) {
-                    $this->error("Entrada de material con ID {$entryId} no encontrada.");
-                    return;
-                }
-                $entry->update(['request' => $request]);
-            });
+            // LÁPIZ COLOR NEGRO
+            $this->fixMaterial(
+                entryRequestId: 365,
+                entryMainId: 1269,
+                materialId: 172,
+                amount: 94,
+                costTotal: 94
+            );
 
-            $this->info("Registros modificados correctamente ✅");
+            // MICROPUNTA COLOR AZUL
+            $this->fixMaterial(
+                entryRequestId: 367,
+                entryMainId: 1270,
+                materialId: 175,
+                amount: 132,
+                costTotal: 1056
+            );
+        });
 
-        } catch (\Exception $e) {
-            $this->error("Ocurrió un error: " . $e->getMessage());
-            return Command::FAILURE;
+        $this->info('✅ Corrección de materiales finalizada correctamente.');
+        return Command::SUCCESS;
+    }
+
+    /**
+     * Corrige entradas y stock de un material específico
+     */
+    private function fixMaterial(
+        int $entryRequestId,
+        int $entryMainId,
+        int $materialId,
+        int $amount,
+        float $costTotal
+    ): void {
+
+        $entryRequest = Entrie_Material::find($entryRequestId);
+        if (!$entryRequest) {
+            $this->error(" Entrada request ID {$entryRequestId} no encontrada.");
+            return;
         }
 
-        return Command::SUCCESS;
+        $entryRequest->update([
+            'request' => $amount
+        ]);
+
+        $entryMain = Entrie_Material::find($entryMainId);
+        if (!$entryMain) {
+            $this->error(" Entrada principal ID {$entryMainId} no encontrada.");
+            return;
+        }
+
+        $entryMain->update([
+            'amount_entries' => $amount,
+            'request' => $amount,
+            'cost_total' => $costTotal
+        ]);
+
+        $material = Material::find($materialId);
+        if (!$material) {
+            $this->error("Material ID {$materialId} no encontrado.");
+            return;
+        }
+
+        $material->update([
+            'stock' => $amount
+        ]);
+
+        $this->info("✔ Material ID {$materialId} corregido correctamente.");
     }
 }
