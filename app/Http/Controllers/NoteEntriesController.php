@@ -330,9 +330,23 @@ class NoteEntriesController extends Controller
     private function generateNoteNumber()
     {
         $latestManagement = Management::latest('id')->first();
-        $lastNote = Note_Entrie::where('management_id', $latestManagement->id)->orderBy('number_note', 'desc')->first();
-        return $lastNote ? $lastNote->number_note + 1 : 1;
+
+        if (!$latestManagement) {
+            return 1;
+        }
+
+        $lastNormalNote = Note_Entrie::where('management_id', $latestManagement->id)
+            ->where('observation', '!=', 'Saldo trasladado')
+            ->orderByDesc('number_note')
+            ->first();
+
+        if (!$lastNormalNote) {
+            return 1;
+        }
+
+        return $lastNormalNote->number_note + 1;
     }
+
 
     public function create_note_request(Request $request)
     {
@@ -382,4 +396,5 @@ class NoteEntriesController extends Controller
         }
         return $notes;
     }
+
 }
