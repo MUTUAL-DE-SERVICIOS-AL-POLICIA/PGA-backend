@@ -223,7 +223,15 @@ class NoteRequestController extends Controller
                 $material->stock -= $amount_to_be_reduced;
                 $material->save();
             }
-            $number_note = NoteRequest::where('state', 'Aceptado')->count() + 1;
+        
+            $number_note = NoteRequest::where('state', 'Aceptado')
+                ->where('management_id', $latestManagement->id)
+                ->max('number_note') + 1;
+
+            if (!$number_note) {
+                $number_note = 1;
+            }
+
             $noteRequest = NoteRequest::find($noteRequestId);
             $noteRequest->state = 'Aceptado';
             $noteRequest->observation = $request->comment;
@@ -258,7 +266,7 @@ class NoteRequestController extends Controller
         $positionName = $this->titlePerson($note_request->user_register);
         $file_title = 'SOLICITUD DE MATERIAL DE ALMACÉN';
 
-        $materials = $note_request->materials()->get()->map(function ($material)  {
+        $materials = $note_request->materials()->get()->map(function ($material) {
             $valor_unit = $this->get_cost_unit_of_material_with_balance($material);
             return [
                 'description' => $material->description,
