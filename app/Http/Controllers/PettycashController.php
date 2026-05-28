@@ -798,7 +798,9 @@ class PettycashController extends Controller
 
                 'tickets' => $n->tickets->map(function ($t) {
                     return [
-                        'id_permission' => $t->id_permission,
+                        //'id_permission' => $t->id_permission,
+                        //modificar para frontend
+                        'id_permission' => $t->ticket_invoice,
                         'from' => $t->from,
                         'to' => $t->to,
                         'cost' => $t->cost,
@@ -951,6 +953,7 @@ class PettycashController extends Controller
                 $note->reason_for_cancellation_id = $typeCancellations->id;
                 break;
         }
+        Ticket::where('pettycash_id', $note->id)->delete();
         $note->save();
         $note->delete();
 
