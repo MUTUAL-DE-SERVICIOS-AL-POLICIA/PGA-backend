@@ -524,7 +524,7 @@ class ProductController extends Controller
 
         $literal = ucfirst($formatter->format($entero));
 
-        $literal .= " con " . str_pad($decimal, 2, "0", STR_PAD_RIGHT) . "/100";
+        $literal .= " con " . str_pad($decimal, 2, "0", STR_PAD_LEFT) . "/100";
 
         return $literal;
     }
